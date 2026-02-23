@@ -2,7 +2,7 @@
   "name": "IronPact",
   "short_name": "IronPact",
   "description": "Track workouts side by side with your gym buddy",
-  "start_url": "/",
+  "start_url": "/ironpact/",
   "display": "standalone",
   "background_color": "#0a0a0f",
   "theme_color": "#ff6b2b",

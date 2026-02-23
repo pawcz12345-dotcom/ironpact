@@ -1,16 +1,17 @@
 const CACHE_NAME = 'ironpact-v1';
+const BASE = '/ironpact';
 const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/css/app.css',
-  '/js/db.js',
-  '/js/app.js',
-  '/js/dashboard.js',
-  '/js/log.js',
-  '/js/program.js',
-  '/js/compare.js',
-  '/js/progress.js',
-  '/js/settings.js',
+  BASE + '/',
+  BASE + '/index.html',
+  BASE + '/css/app.css',
+  BASE + '/js/db.js',
+  BASE + '/js/app.js',
+  BASE + '/js/dashboard.js',
+  BASE + '/js/log.js',
+  BASE + '/js/program.js',
+  BASE + '/js/compare.js',
+  BASE + '/js/progress.js',
+  BASE + '/js/settings.js',
   'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js'
 ];
 
