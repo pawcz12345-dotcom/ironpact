@@ -6,7 +6,7 @@ const App = {
   currentPage: 'dashboard',
   pages: ['dashboard', 'log', 'compare', 'progress', 'settings'],
 
-  init() {
+  async init() {
     // Register service worker
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
@@ -16,10 +16,88 @@ const App = {
       });
     }
 
-    // Check if first launch (no user configured yet)
-    const settings = DB.getSettings();
-    const isFirstLaunch = settings.userName1 === 'Player 1' && settings.userName2 === 'Player 2' && !DB.getCurrentUser();
+    // ── Auth-aware startup ────────────────────────────────────────────────────
+    // Auth.init() has already run (it fires on DOMContentLoaded via supabase.js
+    // loading). Check if we already have a valid cloud session.
 
+    let cloudSession = null;
+    if (typeof Auth !== 'undefined') {
+      cloudSession = await Auth.getSession();
+    }
+
+    if (cloudSession) {
+      // Signed-in path — load cloud profile
+      await this._initWithCloudUser(cloudSession);
+    } else if (typeof Auth !== 'undefined') {
+      // Not signed in — Auth module shows its overlay automatically.
+      // Listen for when the user signs in so we can continue init.
+      Auth.onAuthChange(async (user, profile) => {
+        if (user && !this._cloudInitDone) {
+          this._cloudInitDone = true;
+          await this._initWithCloudUser({ user });
+          // Offer migration of any local data
+          if (typeof Migrate !== 'undefined') Migrate.run();
+        }
+      });
+      // Still boot the shell so it's ready in the background
+      this._initShell(true);
+    } else {
+      // No Auth module — fall back to pure local mode
+      this._initLocal();
+    }
+  },
+
+  /** Boot the app shell with a signed-in cloud user. */
+  async _initWithCloudUser(session) {
+    this._cloudInitDone = true;
+    const userId = session?.user?.id || Auth?.currentUser?.id;
+
+    // Attempt to sync profile from cloud to local-shaped object
+    if (userId && typeof Cloud !== 'undefined') {
+      try {
+        const profile = await Cloud.getProfile(userId);
+        if (profile) {
+          // Map cloud profile fields into the local settings shape so existing
+          // UI components (header, onboarding check) continue to work.
+          const settings = DB.getSettings();
+          settings.userName1 = profile.display_name || settings.userName1;
+          settings.unit = profile.unit || settings.unit;
+          DB.saveSettings(settings);
+
+          // Store cloud user ID so DB helpers can find it
+          if (!DB.getCurrentUser()) {
+            DB.setCurrentUser('user1');
+          }
+        }
+      } catch (e) {
+        console.warn('[App] Could not sync cloud profile:', e);
+      }
+    }
+
+    this._initShell(false);
+
+    // After shell boots, offer migration
+    if (typeof Migrate !== 'undefined') {
+      setTimeout(() => Migrate.run(), 1000);
+    }
+  },
+
+  /** Boot the app using purely local (localStorage) data. */
+  _initLocal() {
+    const settings = DB.getSettings();
+    const isFirstLaunch =
+      settings.userName1 === 'Player 1' &&
+      settings.userName2 === 'Player 2' &&
+      !DB.getCurrentUser();
+
+    this._initShell(isFirstLaunch);
+  },
+
+  /**
+   * Initialise nav, routing, header and user picker.
+   * @param {boolean} isFirstLaunch — show onboarding if true
+   */
+  _initShell(isFirstLaunch) {
     // Init nav
     this.initNav();
 
@@ -37,11 +115,13 @@ const App = {
     // Init user picker
     this.initUserPicker();
 
-    // Show onboarding on first launch
     if (isFirstLaunch) {
       setTimeout(() => this.showOnboarding(), 300);
     } else if (!DB.getCurrentUser()) {
-      this.showUserPicker(true);
+      // Local mode: prompt user selection
+      if (typeof Auth === 'undefined' || !Auth.currentUser) {
+        this.showUserPicker(true);
+      }
     }
   },
 
