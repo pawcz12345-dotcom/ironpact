@@ -450,6 +450,78 @@ const DB = {
     if (data.settings) this.saveSettings(data.settings);
   },
 
+  // Parse and import a CSV string (DD/MM/YYYY format)
+  // Expected columns: date, type, exercise, set, weight, reps, rir
+  importCSV(userId, csvText) {
+    const lines = csvText.trim().split('\n').map(l => l.trim()).filter(l => l);
+    if (!lines.length) return 0;
+
+    // Strip header row (detect by checking if first cell looks like a date)
+    const isHeader = (line) => {
+      const first = line.split(',')[0].trim().toLowerCase();
+      return isNaN(first.charAt(0)) && !first.match(/^\d/);
+    };
+    const dataLines = isHeader(lines[0]) ? lines.slice(1) : lines;
+    if (!dataLines.length) return 0;
+
+    // Parse DD/MM/YYYY → YYYY-MM-DD
+    const parseDate = (str) => {
+      const s = str.trim();
+      // Try DD/MM/YYYY
+      const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+      if (m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+      // Try YYYY-MM-DD passthrough
+      if (s.match(/^\d{4}-\d{2}-\d{2}$/)) return s;
+      return null;
+    };
+
+    // Group rows into sessions keyed by date+type
+    const sessionMap = new Map(); // key: "YYYY-MM-DD|type" → { date, type, exercises: Map<name, sets[]> }
+
+    for (const line of dataLines) {
+      // Support quoted fields (basic)
+      const cols = line.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+      if (cols.length < 6) continue;
+
+      const [rawDate, type, exercise, , weight, reps, rir] = cols;
+      const date = parseDate(rawDate);
+      const normalType = (type || '').toLowerCase().trim();
+      if (!date || !normalType || !exercise) continue;
+
+      const key = `${date}|${normalType}`;
+      if (!sessionMap.has(key)) {
+        sessionMap.set(key, { date, type: normalType, exercises: new Map() });
+      }
+      const session = sessionMap.get(key);
+
+      const exName = exercise.trim();
+      if (!session.exercises.has(exName)) {
+        session.exercises.set(exName, []);
+      }
+
+      const setObj = {
+        weight: weight || '',
+        reps: reps || '',
+        isPR: false,
+      };
+      if (rir !== undefined && rir !== '') {
+        setObj.rir = rir.trim();
+      }
+      session.exercises.get(exName).push(setObj);
+    }
+
+    if (!sessionMap.size) return 0;
+
+    // Convert to session objects and import
+    const sessionsArray = [...sessionMap.values()].map(s => ({
+      date: s.date,
+      type: s.type,
+      exercises: [...s.exercises.entries()].map(([name, sets]) => ({ name, sets })),
+    }));
+
+    return this.importHistoricalSessions(userId, sessionsArray);
+  },
+
   // Import historical sessions (array format)
   importHistoricalSessions(userId, sessionsArray) {
     const existing = this.getSessions(userId);
@@ -466,6 +538,7 @@ const DB = {
           sets: (ex.sets || []).map(set => ({
             weight: set.weight || '',
             reps: set.reps || '',
+            ...(set.rir !== undefined && set.rir !== '' ? { rir: set.rir } : {}),
             isPR: false,
           })),
         })),

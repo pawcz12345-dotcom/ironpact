@@ -73,8 +73,21 @@ const Settings = {
       <div class="settings-section-title">Import Historical Data</div>
       <div class="card" style="margin-bottom: 8px;">
         <div style="font-size: 13px; color: var(--text-2); margin-bottom: 14px; line-height: 1.5;">
-          Bulk import past sessions. Download the template to see the expected format.
+          Bulk import past sessions from a CSV spreadsheet or JSON file.
         </div>
+
+        <!-- CSV Section -->
+        <div style="font-size: 12px; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">CSV (from spreadsheet)</div>
+        <button class="btn btn-secondary btn-sm" onclick="Settings.downloadCSVTemplate()" style="margin-bottom: 10px; width: 100%;">
+          📊 Download CSV Template
+        </button>
+        <input type="file" id="csv-file-input" accept=".csv" style="display:none;" onchange="Settings.importCSVFile(this)">
+        <button class="btn btn-primary" onclick="document.getElementById('csv-file-input').click()" style="margin-bottom: 16px; width: 100%;">
+          📂 Upload CSV File
+        </button>
+
+        <!-- JSON Section -->
+        <div style="font-size: 12px; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">JSON (advanced)</div>
         <button class="btn btn-secondary btn-sm" onclick="Settings.downloadImportTemplate()" style="margin-bottom: 12px; width: 100%;">
           📄 Download JSON Template
         </button>
@@ -82,8 +95,8 @@ const Settings = {
         <textarea id="historical-import-textarea"
                   style="min-height: 100px; font-size: 12px; font-family: monospace; resize: vertical;"
                   placeholder='[{"date":"2025-01-15","type":"push","exercises":[...]}]'></textarea>
-        <button class="btn btn-primary" onclick="Settings.importHistoricalData()" style="margin-top: 10px;">
-          📥 Import Sessions
+        <button class="btn btn-secondary" onclick="Settings.importHistoricalData()" style="margin-top: 10px;">
+          📥 Import JSON
         </button>
         <div style="margin-top: 10px;">
           <input type="file" id="historical-file-input" accept=".json" style="display:none;" onchange="Settings.importHistoricalFile(this)">
@@ -173,6 +186,55 @@ const Settings = {
     if (historySection) {
       historySection.innerHTML = this.renderProgramHistory();
     }
+  },
+
+  downloadCSVTemplate() {
+    const rows = [
+      ['date', 'type', 'exercise', 'set', 'weight', 'reps', 'rir'],
+      ['15/01/2025', 'push', 'Bench Press', '1', '80', '8', '2'],
+      ['15/01/2025', 'push', 'Bench Press', '2', '80', '7', '3'],
+      ['15/01/2025', 'push', 'Bench Press', '3', '75', '8', '2'],
+      ['15/01/2025', 'push', 'Overhead Press', '1', '50', '10', '1'],
+      ['15/01/2025', 'push', 'Overhead Press', '2', '50', '9', '2'],
+      ['17/01/2025', 'pull', 'Deadlift', '1', '120', '5', '2'],
+      ['17/01/2025', 'pull', 'Deadlift', '2', '120', '5', '3'],
+      ['17/01/2025', 'pull', 'Pull-Ups', '1', '0', '8', '1'],
+      ['19/01/2025', 'legs', 'Squat', '1', '100', '5', '2'],
+      ['19/01/2025', 'legs', 'Squat', '2', '100', '5', '3'],
+    ];
+    const csv = rows.map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'ironpact-import-template.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+    App.toast('CSV template downloaded!', 'success');
+  },
+
+  importCSVFile(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const user = DB.getCurrentUser();
+    if (!user) { App.toast('Select a user first', 'error'); return; }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const count = DB.importCSV(user.id, e.target.result);
+        if (count === 0) {
+          App.toast('No valid rows found — check the format', 'error');
+        } else {
+          App.toast(`Imported ${count} sessions from CSV! 💪`, 'success');
+          App.navigate('dashboard');
+        }
+      } catch (err) {
+        App.toast('CSV parse error — check your file', 'error');
+        console.error(err);
+      }
+    };
+    reader.readAsText(file);
+    input.value = '';
   },
 
   downloadImportTemplate() {

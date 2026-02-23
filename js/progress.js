@@ -624,7 +624,7 @@ const Progress = {
               return `
               <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px; gap: 8px;">
                 <span style="color: var(--text-3); font-weight: 600; flex-shrink: 0;">Set ${i+1}</span>
-                <span>${set.weight || '—'}${App.getUnit()} × ${set.reps || '—'} reps</span>
+                <span>${set.weight || '—'}${App.getUnit()} × ${set.reps || '—'} reps${set.rir !== undefined && set.rir !== '' ? ` · <span style="color: var(--text-3);">RIR ${set.rir}</span>` : ''}</span>
                 <span style="color: var(--text-3);">${(parseFloat(set.weight)||0) * (parseInt(set.reps)||0)} vol</span>
                 ${e1rm > 0 ? `<span style="color: var(--warning); font-size: 12px;">${e1rm}</span>` : '<span></span>'}
                 ${set.isPR ? '<span class="badge badge-pr">🏆 PR</span>' : '<span></span>'}
