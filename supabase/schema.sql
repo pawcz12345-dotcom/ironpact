@@ -222,3 +222,6 @@ drop trigger if exists update_sessions_updated_at on sessions;
 create trigger update_sessions_updated_at
   before update on sessions
   for each row execute procedure update_updated_at_column();
+
+-- Allow users to insert their own profile (needed for first sign-in)
+create policy "profiles_insert_own" on profiles for insert with check (auth.uid() = id);

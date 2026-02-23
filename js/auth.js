@@ -53,11 +53,29 @@ const Auth = (() => {
     if (session?.user) {
       currentUser = session.user;
       currentProfile = await _fetchProfile(session.user.id);
+
+      // If profile doesn't exist yet (trigger may not have fired), create it
+      if (!currentProfile) {
+        const sb = _supabase();
+        if (sb) {
+          const displayName = session.user.user_metadata?.full_name ||
+                              session.user.user_metadata?.name ||
+                              session.user.email?.split('@')[0] ||
+                              'Lifter';
+          const { data, error } = await sb.from('profiles').upsert({
+            id: session.user.id,
+            display_name: displayName,
+            email: session.user.email,
+          }, { onConflict: 'id' }).select().single();
+          if (!error) currentProfile = data;
+        }
+      }
+
       _hideAuthOverlay();
+      _hideLoading();
 
       // Trigger onboarding for brand-new users (profile has default name "Lifter")
       if (currentProfile && currentProfile.display_name === 'Lifter' && !currentProfile.username) {
-        // Defer so App has time to initialise
         setTimeout(() => {
           if (typeof App !== 'undefined' && typeof App.showOnboarding === 'function') {
             App.showOnboarding();
