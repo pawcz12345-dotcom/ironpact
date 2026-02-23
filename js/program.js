@@ -12,7 +12,7 @@ const ProgramEditor = {
 
     container.innerHTML = `
       <div class="program-tabs">
-        ${['push', 'pull', 'legs'].map(t => `
+        ${['push', 'pull', 'legs', 'core'].map(t => `
           <div class="program-tab ${this.currentTab === t ? `active-${t}` : ''}"
                onclick="ProgramEditor.switchTab('${t}')">
             ${App.typeEmoji(t)} ${t.charAt(0).toUpperCase() + t.slice(1)}

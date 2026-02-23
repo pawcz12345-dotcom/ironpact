@@ -48,7 +48,7 @@ const Progress = {
 
     // Volume by type (donut)
     const volByType = DB.getVolumeByType(user.id);
-    const totalTypeVol = volByType.push + volByType.pull + volByType.legs;
+    const totalTypeVol = volByType.push + volByType.pull + volByType.legs + volByType.core;
 
     // Bodyweight history
     const bwHistory = DB.getBodyweightHistory(user.id);
@@ -135,9 +135,9 @@ const Progress = {
               <canvas id="chart-donut"></canvas>
             </div>
             <div class="donut-legend">
-              ${['push', 'pull', 'legs'].map(t => {
+              ${['push', 'pull', 'legs', 'core'].map(t => {
                 const pct = totalTypeVol > 0 ? Math.round((volByType[t] / totalTypeVol) * 100) : 0;
-                const color = t === 'push' ? '#ff6b2b' : t === 'pull' ? '#00d4ff' : '#a855f7';
+                const color = t === 'push' ? '#ff6b2b' : t === 'pull' ? '#00d4ff' : t === 'legs' ? '#a855f7' : '#22c55e';
                 return `
                   <div class="donut-legend-item">
                     <div class="donut-legend-dot" style="background: ${color};"></div>
@@ -404,12 +404,14 @@ const Progress = {
     const colors = last20.map(s =>
       s.type === 'push' ? 'rgba(255,107,43,0.6)' :
       s.type === 'pull' ? 'rgba(0,212,255,0.6)' :
-      'rgba(168,85,247,0.6)'
+      s.type === 'legs' ? 'rgba(168,85,247,0.6)' :
+      'rgba(34,197,94,0.6)'
     );
     const borderColors = last20.map(s =>
       s.type === 'push' ? '#ff6b2b' :
       s.type === 'pull' ? '#00d4ff' :
-      '#a855f7'
+      s.type === 'legs' ? '#a855f7' :
+      '#22c55e'
     );
 
     this.chartSessionVolume = new Chart(canvas, {
@@ -437,11 +439,11 @@ const Progress = {
     this.chartDonut = new Chart(canvas, {
       type: 'doughnut',
       data: {
-        labels: ['Push', 'Pull', 'Legs'],
+        labels: ['Push', 'Pull', 'Legs', 'Core'],
         datasets: [{
-          data: [volByType.push, volByType.pull, volByType.legs],
-          backgroundColor: ['rgba(255,107,43,0.8)', 'rgba(0,212,255,0.8)', 'rgba(168,85,247,0.8)'],
-          borderColor: ['#ff6b2b', '#00d4ff', '#a855f7'],
+          data: [volByType.push, volByType.pull, volByType.legs, volByType.core],
+          backgroundColor: ['rgba(255,107,43,0.8)', 'rgba(0,212,255,0.8)', 'rgba(168,85,247,0.8)', 'rgba(34,197,94,0.8)'],
+          borderColor: ['#ff6b2b', '#00d4ff', '#a855f7', '#22c55e'],
           borderWidth: 2,
         }],
       },

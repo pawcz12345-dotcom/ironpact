@@ -221,12 +221,12 @@ const App = {
   },
 
   typeEmoji(type) {
-    const map = { push: '💪', pull: '🏋️', legs: '🦵' };
+    const map = { push: '💪', pull: '🏋️', legs: '🦵', core: '🧱' };
     return map[type] || '🏋️';
   },
 
   typeColor(type) {
-    const map = { push: 'var(--push-color)', pull: 'var(--pull-color)', legs: 'var(--legs-color)' };
+    const map = { push: 'var(--push-color)', pull: 'var(--pull-color)', legs: 'var(--legs-color)', core: 'var(--core-color)' };
     return map[type] || 'var(--accent)';
   },
 };

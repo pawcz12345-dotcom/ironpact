@@ -210,6 +210,7 @@ const Dashboard = {
           <span class="heatmap-legend-dot heatmap-push"></span><span>Push</span>
           <span class="heatmap-legend-dot heatmap-pull"></span><span>Pull</span>
           <span class="heatmap-legend-dot heatmap-legs"></span><span>Legs</span>
+          <span class="heatmap-legend-dot heatmap-core"></span><span>Core</span>
         </div>
       </div>
     `;
@@ -250,6 +251,7 @@ const Dashboard = {
       const color = App.typeColor(session.type).replace('var(--push-color)', '#ff6b2b')
         .replace('var(--pull-color)', '#00d4ff')
         .replace('var(--legs-color)', '#a855f7')
+        .replace('var(--core-color)', '#22c55e')
         .replace('var(--accent)', '#ff6b2b');
       return `<rect x="${x}" y="${y}" width="${w}" height="${barH}" rx="1" fill="${color}" opacity="0.8"/>`;
     }).join('');

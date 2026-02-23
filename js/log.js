@@ -70,7 +70,7 @@ const Log = {
 
       <!-- Type picker -->
       <div class="workout-type-picker">
-        ${['push', 'pull', 'legs'].map(t => `
+        ${['push', 'pull', 'legs', 'core'].map(t => `
           <div class="workout-type-btn ${this.currentType === t ? `selected-${t}` : ''}"
                onclick="Log.selectType('${t}')">
             <div class="type-icon">${App.typeEmoji(t)}</div>

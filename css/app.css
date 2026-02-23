@@ -24,6 +24,7 @@
   --push-color: #ff6b2b;
   --pull-color: #00d4ff;
   --legs-color: #a855f7;
+  --core-color: #22c55e;
   --radius: 16px;
   --radius-sm: 10px;
   --radius-lg: 24px;
@@ -356,6 +357,12 @@ body {
   border: 1px solid rgba(168, 85, 247, 0.3);
 }
 
+.badge-core {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--core-color);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
 .badge-pr {
   background: rgba(255, 204, 0, 0.15);
   color: var(--warning);
@@ -571,6 +578,13 @@ select {
 
 .workout-type-btn.selected-legs .type-label { color: var(--legs-color); }
 
+.workout-type-btn.selected-core {
+  border-color: var(--core-color);
+  background: rgba(34, 197, 94, 0.1);
+}
+
+.workout-type-btn.selected-core .type-label { color: var(--core-color); }
+
 /* ============================================
    Exercise Cards (Logging)
    ============================================ */
@@ -755,6 +769,7 @@ select {
 .session-icon.push { background: rgba(255,107,43,0.15); }
 .session-icon.pull { background: rgba(0,212,255,0.15); }
 .session-icon.legs { background: rgba(168,85,247,0.15); }
+.session-icon.core { background: rgba(34,197,94,0.15); }
 
 .session-info {
   flex: 1;
@@ -948,6 +963,7 @@ select {
 .program-tab.active-push { background: var(--push-color); color: white; }
 .program-tab.active-pull { background: var(--pull-color); color: white; }
 .program-tab.active-legs { background: var(--legs-color); color: white; }
+.program-tab.active-core { background: var(--core-color); color: white; }
 
 .program-exercise-item {
   display: flex;
@@ -1652,6 +1668,10 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 
 .heatmap-legs {
   background: rgba(168,85,247,0.75);
+}
+
+.heatmap-core {
+  background: rgba(34,197,94,0.75);
 }
 
 .heatmap-today {

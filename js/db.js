@@ -42,6 +42,14 @@ const DB = {
       { name: 'Calf Raises', order: 4 },
       { name: 'Hip Thrust', order: 5 },
     ],
+    core: [
+      { name: 'Plank', order: 0 },
+      { name: 'Hanging Leg Raise', order: 1 },
+      { name: 'Ab Wheel Rollout', order: 2 },
+      { name: 'Cable Crunch', order: 3 },
+      { name: 'Russian Twist', order: 4 },
+      { name: 'Dead Bug', order: 5 },
+    ],
   },
 
   DEFAULT_USERS: [
@@ -388,7 +396,7 @@ const DB = {
     const sessions = this.getSessions(userId);
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const result = { push: 0, pull: 0, legs: 0 };
+    const result = { push: 0, pull: 0, legs: 0, core: 0 };
     for (const s of sessions) {
       if (new Date(s.date) < monthStart) continue;
       const vol = (s.exercises || []).reduce((total, ex) =>
@@ -564,7 +572,7 @@ const DB = {
     const sessions = this.getSessions(userId).sort((a, b) => new Date(b.date) - new Date(a.date));
     if (!sessions.length) return 'push';
     const last = sessions[0].type;
-    const rotation = ['push', 'pull', 'legs'];
+    const rotation = ['push', 'pull', 'legs', 'core'];
     const idx = rotation.indexOf(last);
     return rotation[(idx + 1) % 3];
   },
