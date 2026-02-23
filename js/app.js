@@ -76,6 +76,12 @@ const App = {
 
     this._initShell(false);
 
+    // Initialise token balance pill
+    if (userId && typeof Tokens !== 'undefined') {
+      Tokens.renderBalancePill(); // show cached immediately
+      Tokens.refreshBalance(userId); // then sync from cloud
+    }
+
     // After shell boots, offer migration
     if (typeof Migrate !== 'undefined') {
       setTimeout(() => Migrate.run(), 1000);

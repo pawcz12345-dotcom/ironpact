@@ -496,7 +496,7 @@ const Log = {
       // Get current program version
       const programVersion = DB.getCurrentProgramVersion();
 
-      DB.addSession(user.id, {
+      const savedSession = {
         type: this.currentType,
         date: todayStr,
         exercises,
@@ -505,8 +505,14 @@ const Log = {
         durationMinutes,
         programVersion,
         createdAt: new Date().toISOString(),
-      });
+      };
+      DB.addSession(user.id, savedSession);
       App.toast('Workout saved! 💪', 'success');
+
+      // Award tokens (cloud users only)
+      if (typeof Tokens !== 'undefined' && typeof Auth !== 'undefined' && Auth.currentUser) {
+        Tokens.onSessionSaved(Auth.currentUser.id, savedSession);
+      }
     }
 
     this.editingSessionId = null;

@@ -134,6 +134,26 @@ const Settings = {
         <div style="color: var(--accent);">→</div>
       </div>
 
+      <!-- Tokens -->
+      <div class="settings-section-title">🪙 Tokens</div>
+      <div class="card" style="padding: 16px; margin-bottom: 8px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+          <div>
+            <div style="font-size: 28px; font-weight: 900; color: #ffc107;" id="settings-token-balance">🪙 —</div>
+            <div style="font-size: 12px; color: var(--text-3); margin-top: 2px;">Current balance</div>
+          </div>
+          <div style="font-size: 12px; color: var(--text-2); text-align: right; line-height: 1.8;">
+            Log session <span style="color:#ffc107; font-weight:700;">+1</span><br>
+            New PR <span style="color:#ffc107; font-weight:700;">+2</span><br>
+            4-session week <span style="color:#ffc107; font-weight:700;">+5</span>
+          </div>
+        </div>
+        <div style="font-size: 12px; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Recent Transactions</div>
+        <div id="token-history-container">
+          <div style="color: var(--text-3); font-size: 13px; padding: 8px 0;">Sign in to see your history</div>
+        </div>
+      </div>
+
       <!-- About -->
       <div class="settings-section-title">About</div>
       <div class="card card-sm">
@@ -152,6 +172,16 @@ const Settings = {
     // Render program editor
     ProgramEditor.currentTab = ProgramEditor.currentTab || 'push';
     ProgramEditor.renderInto('program-container');
+
+    // Load token balance + history
+    if (typeof Auth !== 'undefined' && Auth.currentUser && typeof Tokens !== 'undefined') {
+      const userId = Auth.currentUser.id;
+      Tokens.refreshBalance(userId).then(balance => {
+        const balEl = document.getElementById('settings-token-balance');
+        if (balEl) balEl.textContent = `🪙 ${balance}`;
+      });
+      Tokens.renderHistory('token-history-container', userId);
+    }
   },
 
   renderProgramHistory() {
