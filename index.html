@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="IronPact">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#ff6b2b">
+  <meta name="description" content="Track workouts side by side with your gym buddy">
+
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
+
+  <title>IronPact</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <div id="app">
+
+    <!-- Header -->
+    <header id="app-header">
+      <div class="header-logo">⚡ IronPact</div>
+      <div class="header-user" id="header-user" onclick="App.showUserPicker()">
+        <span>Select User</span>
+      </div>
+    </header>
+
+    <!-- Pages -->
+    <div id="pages">
+
+      <!-- Dashboard -->
+      <div class="page" id="page-dashboard"></div>
+
+      <!-- Log Workout -->
+      <div class="page" id="page-log"></div>
+
+      <!-- Compare -->
+      <div class="page" id="page-compare"></div>
+
+      <!-- Progress -->
+      <div class="page" id="page-progress"></div>
+
+      <!-- Settings -->
+      <div class="page" id="page-settings"></div>
+
+    </div>
+
+    <!-- Bottom Navigation -->
+    <nav id="bottom-nav">
+
+      <!-- Dashboard -->
+      <div class="nav-item active" data-page="dashboard">
+        <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        <span class="nav-label">Home</span>
+      </div>
+
+      <!-- Compare -->
+      <div class="nav-item" data-page="compare">
+        <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <span class="nav-label">Compare</span>
+      </div>
+
+      <!-- Log (center) -->
+      <div class="nav-item nav-log" data-page="log">
+        <div class="nav-icon-wrap">
+          <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </div>
+        <span class="nav-label">Log</span>
+      </div>
+
+      <!-- Progress -->
+      <div class="nav-item" data-page="progress">
+        <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        <span class="nav-label">Progress</span>
+      </div>
+
+      <!-- Settings -->
+      <div class="nav-item" data-page="settings">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span class="nav-label">Settings</span>
+      </div>
+
+    </nav>
+
+  </div>
+
+  <!-- User Picker Overlay -->
+  <div class="overlay" id="user-picker-overlay">
+    <div class="overlay-sheet">
+      <div class="overlay-handle"></div>
+      <div class="overlay-title">Who's logging?</div>
+      <div id="user-picker-list"></div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast"></div>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/dashboard.js"></script>
+  <script src="js/log.js"></script>
+  <script src="js/program.js"></script>
+  <script src="js/compare.js"></script>
+  <script src="js/progress.js"></script>
+  <script src="js/settings.js"></script>
+
+  <script>
+    // Boot the app when DOM is ready
+    document.addEventListener('DOMContentLoaded', () => {
+      App.init();
+    });
+  </script>
+</body>
+</html>
