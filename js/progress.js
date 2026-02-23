@@ -24,6 +24,21 @@ const Progress = {
     }
 
     const sessions = DB.getSessions(user.id).sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    if (sessions.length === 0) {
+      container.innerHTML = `
+        <div class="page-title">Progress</div>
+        <div class="empty-state" style="margin-top: 40px;">
+          <div class="empty-icon">🏋️</div>
+          <div class="empty-title">No sessions yet</div>
+          <div class="empty-body">Log your first workout and your stats, charts, and PRs will appear here.</div>
+          <button class="btn btn-primary" onclick="App.navigate('log')" style="margin-top: 20px; width: auto; padding: 12px 28px;">
+            Log First Workout →
+          </button>
+        </div>
+      `;
+      return;
+    }
     const prs = DB.getPRs(user.id);
     const stats = DB.getStats(user.id);
 
@@ -649,8 +664,21 @@ const Progress = {
         <button class="btn btn-secondary" onclick="Log.editSession('${session.id}')" style="flex: 1;">
           ✏️ Edit
         </button>
+        <button class="btn btn-danger" onclick="Progress.deleteSession('${session.id}')" style="flex: 1;">
+          🗑️ Delete
+        </button>
       </div>
     `;
+  },
+
+  deleteSession(sessionId) {
+    const user = DB.getCurrentUser();
+    if (!user) return;
+    if (confirm('Delete this session? This cannot be undone.')) {
+      DB.deleteSession(user.id, sessionId);
+      App.toast('Session deleted', '');
+      this.render();
+    }
   },
 
   escHtml(str) {

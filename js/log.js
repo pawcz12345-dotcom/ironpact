@@ -147,8 +147,9 @@ const Log = {
             <span>Set</span>
             <span>${unit}</span>
             <span>Reps</span>
-            <span>Vol</span>
+            <span>RIR</span>
             <span>PR</span>
+            <span></span>
           </div>
           <div id="sets-${idx}">
             ${(ex.sets || []).map((set, si) => this.renderSetRow(idx, si, set)).join('')}
@@ -184,10 +185,16 @@ const Log = {
                value="${set.reps || ''}"
                onchange="Log.updateSet(${exIdx}, ${setIdx}, 'reps', this.value)"
                id="set-r-${exIdx}-${setIdx}">
-        <div style="text-align:center; font-size: 13px; color: var(--text-2); font-weight: 600;" id="set-vol-${exIdx}-${setIdx}">${vol}</div>
+        <input class="set-input set-input-rir" type="number"
+               inputmode="numeric"
+               placeholder="—"
+               value="${set.rir !== undefined && set.rir !== '' ? set.rir : ''}"
+               onchange="Log.updateSet(${exIdx}, ${setIdx}, 'rir', this.value)"
+               id="set-rir-${exIdx}-${setIdx}">
         <div class="pr-toggle ${set.isPR ? 'active' : ''}" 
              id="pr-toggle-${exIdx}-${setIdx}"
              onclick="Log.togglePR(${exIdx}, ${setIdx})">🏆</div>
+        <div class="remove-set-btn" onclick="Log.removeSet(${exIdx}, ${setIdx})">×</div>
       </div>
     `;
   },
@@ -196,6 +203,7 @@ const Log = {
     return {
       weight: prevSet ? prevSet.weight : '',
       reps: prevSet ? prevSet.reps : '',
+      rir: prevSet && prevSet.rir !== undefined ? prevSet.rir : '',
       isPR: false,
     };
   },
@@ -315,6 +323,20 @@ const Log = {
     container.innerHTML = this.buildHTML();
   },
 
+  removeSet(exIdx, setIdx) {
+    const sets = this.exercises[exIdx].sets;
+    if (sets.length <= 1) {
+      App.toast("Can't remove the last set", 'error');
+      return;
+    }
+    sets.splice(setIdx, 1);
+    // Re-render just this exercise's sets
+    const container = document.getElementById(`sets-${exIdx}`);
+    if (container) {
+      container.innerHTML = sets.map((s, si) => this.renderSetRow(exIdx, si, s)).join('');
+    }
+  },
+
   addSet(exIdx) {
     const sets = this.exercises[exIdx].sets;
     const prevSet = sets[sets.length - 1];
@@ -342,15 +364,8 @@ const Log = {
     const set = this.exercises[exIdx].sets[setIdx];
     set[field] = value;
 
-    // Update volume display
-    const w = parseFloat(set.weight) || 0;
-    const r = parseInt(set.reps) || 0;
-    const vol = w && r ? Math.round(w * r) : '-';
-    const volEl = document.getElementById(`set-vol-${exIdx}-${setIdx}`);
-    if (volEl) volEl.textContent = vol;
-
-    // Auto-detect PR
-    if (set.weight && set.reps) {
+    // Auto-detect PR (only on weight/reps change)
+    if ((field === 'weight' || field === 'reps') && set.weight && set.reps) {
       const user = DB.getCurrentUser();
       const exName = this.exercises[exIdx].name;
       if (user && exName) {

@@ -16,11 +16,9 @@ const App = {
       });
     }
 
-    // Check if user is set
-    const user = DB.getCurrentUser();
-    if (!user) {
-      this.showUserPicker(true);
-    }
+    // Check if first launch (no user configured yet)
+    const settings = DB.getSettings();
+    const isFirstLaunch = settings.userName1 === 'Player 1' && settings.userName2 === 'Player 2' && !DB.getCurrentUser();
 
     // Init nav
     this.initNav();
@@ -38,6 +36,83 @@ const App = {
 
     // Init user picker
     this.initUserPicker();
+
+    // Show onboarding on first launch
+    if (isFirstLaunch) {
+      setTimeout(() => this.showOnboarding(), 300);
+    } else if (!DB.getCurrentUser()) {
+      this.showUserPicker(true);
+    }
+  },
+
+  showOnboarding() {
+    // Remove any existing onboarding
+    const existing = document.getElementById('onboarding-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'onboarding-overlay';
+    overlay.className = 'overlay open';
+    overlay.innerHTML = `
+      <div class="overlay-sheet" style="max-height: 90vh; overflow-y: auto;">
+        <div class="overlay-handle"></div>
+        <div style="font-size: 32px; text-align: center; margin-bottom: 8px;">⚡</div>
+        <div class="overlay-title" style="text-align: center; font-size: 22px;">Welcome to IronPact</div>
+        <div style="font-size: 14px; color: var(--text-2); text-align: center; margin-bottom: 24px; line-height: 1.5;">
+          Track your lifts, crush PRs, and compete with your gym buddy.
+        </div>
+
+        <div class="form-label">Your name</div>
+        <input id="onboard-name1" class="input" type="text" placeholder="e.g. Alex"
+               style="margin-bottom: 16px;"
+               value="">
+
+        <div class="form-label">Gym buddy's name <span style="color: var(--text-3); font-weight: 400;">(optional)</span></div>
+        <input id="onboard-name2" class="input" type="text" placeholder="e.g. Jordan"
+               style="margin-bottom: 20px;"
+               value="">
+
+        <div class="form-label">Weight unit</div>
+        <div class="unit-toggle" style="margin-bottom: 28px;">
+          <button class="unit-btn active" id="onboard-kg" onclick="App.onboardSelectUnit('kg')">kg</button>
+          <button class="unit-btn" id="onboard-lbs" onclick="App.onboardSelectUnit('lbs')">lbs</button>
+        </div>
+
+        <button class="btn btn-primary" onclick="App.completeOnboarding()" style="width: 100%;">
+          Let's go 💪
+        </button>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+  },
+
+  onboardSelectUnit(unit) {
+    document.getElementById('onboard-kg').classList.toggle('active', unit === 'kg');
+    document.getElementById('onboard-lbs').classList.toggle('active', unit === 'lbs');
+    this._onboardUnit = unit;
+  },
+
+  completeOnboarding() {
+    const name1 = (document.getElementById('onboard-name1')?.value || '').trim() || 'Player 1';
+    const name2 = (document.getElementById('onboard-name2')?.value || '').trim() || 'Player 2';
+    const unit = this._onboardUnit || 'kg';
+
+    const settings = DB.getSettings();
+    settings.userName1 = name1;
+    settings.userName2 = name2;
+    settings.unit = unit;
+    DB.saveSettings(settings);
+
+    // Auto-select user 1
+    DB.setCurrentUser('user1');
+
+    // Remove overlay
+    const overlay = document.getElementById('onboarding-overlay');
+    if (overlay) overlay.remove();
+
+    this.updateHeaderUser();
+    this.navigate('dashboard');
+    this.toast(`Welcome, ${name1}! 🎉`, 'success');
   },
 
   initNav() {

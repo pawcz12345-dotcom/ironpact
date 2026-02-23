@@ -628,7 +628,7 @@ select {
 /* Set rows */
 .sets-header {
   display: grid;
-  grid-template-columns: 32px 1fr 1fr 1fr 44px;
+  grid-template-columns: 32px 1fr 1fr 1fr 36px 28px;
   gap: 6px;
   margin-bottom: 8px;
   align-items: center;
@@ -649,7 +649,7 @@ select {
 
 .set-row {
   display: grid;
-  grid-template-columns: 32px 1fr 1fr 1fr 44px;
+  grid-template-columns: 32px 1fr 1fr 1fr 36px 28px;
   gap: 6px;
   align-items: center;
   margin-bottom: 8px;
@@ -1822,3 +1822,69 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   color: var(--warning);
 }
 
+
+/* ============================================
+   RIR input (narrower than weight/reps)
+   ============================================ */
+.set-input-rir {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+/* ============================================
+   Remove set button
+   ============================================ */
+.remove-set-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--bg-4);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text-3);
+  line-height: 1;
+  flex-shrink: 0;
+  transition: all var(--transition);
+}
+
+.remove-set-btn:active {
+  background: rgba(255, 68, 85, 0.2);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/* ============================================
+   Onboarding overlay (reuses .overlay sheet)
+   ============================================ */
+#onboarding-overlay .input {
+  width: 100%;
+  padding: 12px 14px;
+  font-size: 16px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: inherit;
+  box-sizing: border-box;
+  margin-bottom: 0;
+}
+
+#onboarding-overlay .input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+#onboarding-overlay .form-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+  display: block;
+}
