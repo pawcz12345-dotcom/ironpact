@@ -74,6 +74,11 @@ const App = {
 
     this.currentPage = page;
 
+    // Stop rest timer if navigating away from log
+    if (page !== 'log' && typeof Log !== 'undefined') {
+      Log.stopRestTimer();
+    }
+
     // Render page content
     switch (page) {
       case 'dashboard': Dashboard.render(); break;

@@ -1,15 +1,9 @@
 /**
- * IronPact — Program Editor Page
+ * IronPact — Program Editor (embedded in Settings)
  */
 
 const ProgramEditor = {
   currentTab: 'push',
-
-  render() {
-    const container = document.getElementById('page-settings');
-    // Program editor is embedded in settings page
-    // It's called from there
-  },
 
   renderInto(containerId) {
     const container = document.getElementById(containerId);
@@ -30,7 +24,7 @@ const ProgramEditor = {
         ${this.renderExerciseList(program[this.currentTab] || [])}
       </div>
 
-      <button class="btn btn-secondary" onclick="ProgramEditor.addExercise()">
+      <button class="btn btn-secondary" onclick="ProgramEditor.addExercise()" style="margin-top: 8px;">
         + Add Exercise
       </button>
     `;
@@ -55,7 +49,6 @@ const ProgramEditor = {
   },
 
   switchTab(tab) {
-    // Save current before switching
     this.currentTab = tab;
     const container = document.getElementById('program-container');
     if (container) this.renderInto('program-container');

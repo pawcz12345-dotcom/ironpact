@@ -57,8 +57,40 @@ const Settings = {
 
       <!-- Program Editor -->
       <div class="settings-section-title">Workout Program</div>
-      <div class="card" style="padding: 16px; margin-bottom: 0;">
+      <div class="card" style="padding: 16px; margin-bottom: 8px;">
         <div id="program-container"></div>
+        <button class="btn btn-secondary" onclick="Settings.saveProgram()" style="margin-top: 12px;">
+          💾 Save Program
+        </button>
+      </div>
+
+      <!-- Program History -->
+      <div id="program-history-section">
+        ${this.renderProgramHistory()}
+      </div>
+
+      <!-- Historical Data Import -->
+      <div class="settings-section-title">Import Historical Data</div>
+      <div class="card" style="margin-bottom: 8px;">
+        <div style="font-size: 13px; color: var(--text-2); margin-bottom: 14px; line-height: 1.5;">
+          Bulk import past sessions. Download the template to see the expected format.
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="Settings.downloadImportTemplate()" style="margin-bottom: 12px; width: 100%;">
+          📄 Download JSON Template
+        </button>
+        <div style="font-size: 12px; color: var(--text-3); margin-bottom: 10px;">Or paste JSON directly:</div>
+        <textarea id="historical-import-textarea"
+                  style="min-height: 100px; font-size: 12px; font-family: monospace; resize: vertical;"
+                  placeholder='[{"date":"2025-01-15","type":"push","exercises":[...]}]'></textarea>
+        <button class="btn btn-primary" onclick="Settings.importHistoricalData()" style="margin-top: 10px;">
+          📥 Import Sessions
+        </button>
+        <div style="margin-top: 10px;">
+          <input type="file" id="historical-file-input" accept=".json" style="display:none;" onchange="Settings.importHistoricalFile(this)">
+          <button class="btn btn-secondary btn-sm" onclick="document.getElementById('historical-file-input').click()" style="width: 100%;">
+            📂 Upload JSON File
+          </button>
+        </div>
       </div>
 
       <!-- Data Management -->
@@ -95,7 +127,7 @@ const Settings = {
         <div style="font-size: 24px; font-weight: 900; background: linear-gradient(135deg, #ff6b2b, #ff9a5c); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 4px;">
           IronPact
         </div>
-        <div style="font-size: 13px; color: var(--text-2);">v1.0.0 · Built for two</div>
+        <div style="font-size: 13px; color: var(--text-2);">v2.0.0 · Built for two</div>
         <div style="font-size: 12px; color: var(--text-3); margin-top: 8px; line-height: 1.5;">
           Track your workouts, crush your PRs, and stay ahead of your gym buddy. All data stored locally — no account needed.
         </div>
@@ -107,6 +139,136 @@ const Settings = {
     // Render program editor
     ProgramEditor.currentTab = ProgramEditor.currentTab || 'push';
     ProgramEditor.renderInto('program-container');
+  },
+
+  renderProgramHistory() {
+    const history = DB.getProgramHistory();
+    if (!history.length) return '';
+    const recent = [...history].reverse().slice(0, 5);
+    return `
+      <div class="card card-sm" style="margin-bottom: 16px;">
+        <div class="card-title">Program History</div>
+        ${recent.map(h => `
+          <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px;">
+            <div>
+              <span style="color: var(--accent); font-weight: 700;">v${h.version}</span>
+              <span style="color: var(--text-2); margin-left: 8px;">${h.savedAt}</span>
+            </div>
+            <div style="color: var(--text-3); font-size: 11px;">
+              ${Object.values(h.exercises || {}).reduce((t, arr) => t + arr.length, 0)} exercises
+            </div>
+          </div>
+        `).join('')}
+        ${history.length > 5 ? `<div style="font-size: 11px; color: var(--text-3); margin-top: 8px;">${history.length} versions total</div>` : ''}
+      </div>
+    `;
+  },
+
+  saveProgram() {
+    const program = DB.getProgram();
+    const version = DB.saveProgramVersion(program);
+    App.toast(`Program saved as v${version}!`, 'success');
+    // Re-render history section
+    const historySection = document.getElementById('program-history-section');
+    if (historySection) {
+      historySection.innerHTML = this.renderProgramHistory();
+    }
+  },
+
+  downloadImportTemplate() {
+    const template = [
+      {
+        date: '2025-01-15',
+        type: 'push',
+        notes: 'Optional session notes',
+        bodyweight: 80,
+        exercises: [
+          {
+            name: 'Bench Press',
+            sets: [
+              { weight: 80, reps: 8 },
+              { weight: 80, reps: 7 },
+              { weight: 75, reps: 8 },
+            ],
+          },
+          {
+            name: 'Overhead Press',
+            sets: [
+              { weight: 50, reps: 10 },
+              { weight: 50, reps: 9 },
+            ],
+          },
+        ],
+      },
+      {
+        date: '2025-01-17',
+        type: 'pull',
+        exercises: [
+          {
+            name: 'Deadlift',
+            sets: [
+              { weight: 120, reps: 5 },
+              { weight: 120, reps: 5 },
+            ],
+          },
+        ],
+      },
+    ];
+    const json = JSON.stringify(template, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'ironpact-import-template.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    App.toast('Template downloaded!', 'success');
+  },
+
+  importHistoricalData() {
+    const textarea = document.getElementById('historical-import-textarea');
+    if (!textarea || !textarea.value.trim()) {
+      App.toast('Paste JSON data first', 'error');
+      return;
+    }
+    this._processHistoricalImport(textarea.value.trim());
+    textarea.value = '';
+  },
+
+  importHistoricalFile(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      this._processHistoricalImport(e.target.result);
+    };
+    reader.readAsText(file);
+    input.value = '';
+  },
+
+  _processHistoricalImport(jsonStr) {
+    const user = DB.getCurrentUser();
+    if (!user) { App.toast('Select a user first', 'error'); return; }
+
+    try {
+      const data = JSON.parse(jsonStr);
+      if (!Array.isArray(data)) {
+        App.toast('Expected an array of sessions', 'error');
+        return;
+      }
+      // Validate basic structure
+      const valid = data.every(s => s.date && s.type && Array.isArray(s.exercises));
+      if (!valid) {
+        App.toast('Invalid format — check the template', 'error');
+        return;
+      }
+      const count = DB.importHistoricalSessions(user.id, data);
+      App.toast(`Imported ${count} sessions! 💪`, 'success');
+      App.navigate('dashboard');
+    } catch (err) {
+      App.toast('Invalid JSON — check your data', 'error');
+      console.error(err);
+    }
   },
 
   updateSetting(key, value) {

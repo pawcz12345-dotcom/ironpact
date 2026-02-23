@@ -1514,3 +1514,291 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   letter-spacing: -0.8px;
   margin-bottom: 20px;
 }
+
+/* ============================================
+   V2 Features — Rest Timer Pill
+   ============================================ */
+.rest-timer-pill {
+  position: fixed;
+  bottom: calc(var(--nav-height) + 12px + var(--safe-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 150;
+  background: rgba(19, 19, 30, 0.96);
+  border: 1px solid var(--border-accent);
+  border-radius: 24px;
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: transform 0.15s ease;
+  white-space: nowrap;
+}
+
+.rest-timer-pill:active {
+  transform: translateX(-50%) scale(0.95);
+}
+
+.rest-timer-text {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0.3px;
+}
+
+/* ============================================
+   V2 Features — Bodyweight Field
+   ============================================ */
+.bodyweight-field {
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+}
+
+.bodyweight-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-3);
+  flex: 1;
+  white-space: nowrap;
+}
+
+.bodyweight-input {
+  width: 90px;
+  padding: 8px 10px;
+  font-size: 15px;
+  text-align: center;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
+/* ============================================
+   V2 Features — Notes Field
+   ============================================ */
+.notes-field {
+  margin-bottom: 16px;
+}
+
+.notes-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.notes-textarea {
+  width: 100%;
+  min-height: 80px;
+  resize: vertical;
+  font-size: 15px;
+  line-height: 1.5;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+}
+
+/* ============================================
+   V2 Features — Heatmap
+   ============================================ */
+.heatmap-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.heatmap-day-label {
+  text-align: center;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text-3);
+  text-transform: uppercase;
+  padding-bottom: 2px;
+}
+
+.heatmap-cell {
+  aspect-ratio: 1;
+  border-radius: 4px;
+  min-width: 0;
+  cursor: default;
+}
+
+.heatmap-empty {
+  background: transparent;
+}
+
+.heatmap-dim {
+  background: rgba(255,255,255,0.05);
+}
+
+.heatmap-push {
+  background: rgba(255,107,43,0.75);
+}
+
+.heatmap-pull {
+  background: rgba(0,212,255,0.75);
+}
+
+.heatmap-legs {
+  background: rgba(168,85,247,0.75);
+}
+
+.heatmap-today {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.heatmap-legend {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.heatmap-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  display: inline-block;
+  margin-right: 4px;
+  flex-shrink: 0;
+}
+
+.heatmap-legend span {
+  font-size: 11px;
+  color: var(--text-3);
+  display: inline-flex;
+  align-items: center;
+}
+
+/* ============================================
+   V2 Features — Dashboard Sparklines
+   ============================================ */
+.dashboard-sparkline {
+  display: flex;
+  align-items: flex-end;
+}
+
+/* ============================================
+   V2 Features — Chart Mode Toggle
+   ============================================ */
+.chart-mode-toggle {
+  display: flex;
+  gap: 6px;
+  margin: 10px 0;
+  background: var(--bg-3);
+  padding: 3px;
+  border-radius: var(--radius-sm);
+}
+
+.chart-mode-btn {
+  flex: 1;
+  padding: 7px 8px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  color: var(--text-3);
+  transition: all var(--transition);
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  text-align: center;
+}
+
+.chart-mode-btn.active {
+  background: var(--accent);
+  color: white;
+}
+
+/* ============================================
+   V2 Features — Donut Legend
+   ============================================ */
+.donut-legend {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.donut-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.donut-legend-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ============================================
+   V2 Features — Compare Pickers
+   ============================================ */
+.compare-pickers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.compare-picker-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.compare-picker-label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.compare-session-select {
+  font-size: 13px;
+  padding: 8px 10px;
+  padding-right: 28px;
+}
+
+.compare-no-session {
+  font-size: 13px;
+  color: var(--text-3);
+  padding: 10px;
+  text-align: center;
+  background: var(--bg-3);
+  border-radius: var(--radius-sm);
+}
+
+/* ============================================
+   V2 Features — Exercise select wrap
+   ============================================ */
+.exercise-select-wrap {
+  margin-bottom: 4px;
+}
+
+.exercise-select-wrap select {
+  width: 100%;
+}
+
+/* PR table 4-column fix */
+.pr-table th:nth-child(4),
+.pr-table td:nth-child(4) {
+  text-align: right;
+  color: var(--warning);
+}
+

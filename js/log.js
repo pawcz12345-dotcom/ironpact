@@ -6,6 +6,9 @@ const Log = {
   currentType: null,
   exercises: [],
   editingSessionId: null,
+  restTimerInterval: null,
+  restTimerSeconds: 0,
+  restTimerActive: false,
 
   render(type = null, sessionId = null) {
     this.editingSessionId = sessionId;
@@ -31,15 +34,22 @@ const Log = {
       if (session) {
         this.currentType = session.type;
         this.exercises = JSON.parse(JSON.stringify(session.exercises || []));
+        this._editBodyweight = session.bodyweight || '';
+        this._editNotes = session.notes || '';
       }
     } else {
       this.currentType = type || DB.getSuggestedWorkout();
+      this._editBodyweight = '';
+      this._editNotes = '';
       // Load from program
       this.loadFromProgram(this.currentType);
+      // Record start time
+      DB.setWorkoutStart();
     }
 
     container.innerHTML = this.buildHTML();
     this.bindEvents();
+    this.stopRestTimer(); // Reset any existing timer
   },
 
   loadFromProgram(type) {
@@ -53,6 +63,8 @@ const Log = {
 
   buildHTML() {
     const unit = App.getUnit();
+    const bw = this._editBodyweight || '';
+    const notes = this._editNotes || '';
     return `
       <div class="page-title">${this.editingSessionId ? 'Edit' : 'Log'} Workout</div>
 
@@ -67,6 +79,16 @@ const Log = {
         `).join('')}
       </div>
 
+      <!-- Bodyweight (optional) -->
+      <div class="bodyweight-field">
+        <label class="bodyweight-label">Bodyweight (${unit}) — optional</label>
+        <input class="bodyweight-input" type="number" inputmode="decimal"
+               placeholder="e.g. 80"
+               value="${this.escHtml(bw)}"
+               id="bodyweight-input"
+               onchange="Log.updateBodyweight(this.value)">
+      </div>
+
       <!-- Exercises -->
       <div id="exercises-list">
         ${this.exercises.map((ex, i) => this.renderExerciseCard(ex, i)).join('')}
@@ -76,6 +98,15 @@ const Log = {
       <button class="btn btn-secondary" onclick="Log.addExercise()" style="margin-bottom: 16px;">
         + Add Exercise
       </button>
+
+      <!-- Notes (optional) -->
+      <div class="notes-field">
+        <label class="notes-label">Notes (optional)</label>
+        <textarea class="notes-textarea"
+                  id="notes-textarea"
+                  placeholder="How'd it feel? Anything to remember?"
+                  oninput="Log.updateNotes(this.value)">${this.escHtml(notes)}</textarea>
+      </div>
 
       <!-- Save button -->
       <button class="btn btn-primary" onclick="Log.save()">
@@ -88,7 +119,7 @@ const Log = {
         </button>
       ` : ''}
 
-      <div style="height: 8px;"></div>
+      <div style="height: 80px;"></div>
     `;
   },
 
@@ -135,6 +166,9 @@ const Log = {
     const vol = set.weight && set.reps
       ? Math.round(parseFloat(set.weight) * parseInt(set.reps))
       : '-';
+    const e1rm = (set.weight && set.reps)
+      ? DB.calcE1RM(set.weight, set.reps)
+      : 0;
     return `
       <div class="set-row" id="set-${exIdx}-${setIdx}">
         <div class="set-num ${set.isPR ? 'is-pr' : ''}" id="set-num-${exIdx}-${setIdx}">${setIdx + 1}</div>
@@ -179,6 +213,14 @@ const Log = {
 
   bindEvents() {
     // Nothing extra needed — all handlers are inline
+  },
+
+  updateBodyweight(value) {
+    this._editBodyweight = value;
+  },
+
+  updateNotes(value) {
+    this._editNotes = value;
   },
 
   updateExerciseName(idx, value) {
@@ -291,6 +333,9 @@ const Log = {
         if (input) input.focus();
       }, 50);
     }
+
+    // Start rest timer
+    this.startRestTimer();
   },
 
   updateSet(exIdx, setIdx, field, value) {
@@ -331,6 +376,59 @@ const Log = {
     if (num) num.className = `set-num ${isPR ? 'is-pr' : ''}`;
   },
 
+  // --- Rest Timer ---
+  startRestTimer() {
+    this.stopRestTimer();
+    this.restTimerSeconds = 0;
+    this.restTimerActive = true;
+    this.showRestTimerPill();
+    this.restTimerInterval = setInterval(() => {
+      this.restTimerSeconds++;
+      this.updateRestTimerDisplay();
+    }, 1000);
+  },
+
+  stopRestTimer() {
+    if (this.restTimerInterval) {
+      clearInterval(this.restTimerInterval);
+      this.restTimerInterval = null;
+    }
+    this.restTimerActive = false;
+    this.hideRestTimerPill();
+  },
+
+  resetRestTimer() {
+    this.restTimerSeconds = 0;
+    this.updateRestTimerDisplay();
+  },
+
+  showRestTimerPill() {
+    let pill = document.getElementById('rest-timer-pill');
+    if (!pill) {
+      pill = document.createElement('div');
+      pill.id = 'rest-timer-pill';
+      pill.className = 'rest-timer-pill';
+      pill.onclick = () => Log.resetRestTimer();
+      document.body.appendChild(pill);
+    }
+    pill.style.display = 'flex';
+    this.updateRestTimerDisplay();
+  },
+
+  hideRestTimerPill() {
+    const pill = document.getElementById('rest-timer-pill');
+    if (pill) pill.style.display = 'none';
+  },
+
+  updateRestTimerDisplay() {
+    const pill = document.getElementById('rest-timer-pill');
+    if (!pill) return;
+    const m = Math.floor(this.restTimerSeconds / 60);
+    const s = this.restTimerSeconds % 60;
+    const timeStr = `${m}:${String(s).padStart(2, '0')}`;
+    pill.innerHTML = `<span class="rest-timer-text">Rest: ${timeStr} ⏱️</span>`;
+  },
+
   validate() {
     if (!this.currentType) {
       App.toast('Select a workout type', 'error');
@@ -351,6 +449,9 @@ const Log = {
     const user = DB.getCurrentUser();
     if (!user) { App.toast('Select a user first', 'error'); return; }
 
+    // Stop rest timer
+    this.stopRestTimer();
+
     // Filter out empty exercises
     const exercises = this.exercises
       .filter(ex => ex.name && ex.sets.some(s => s.weight || s.reps))
@@ -360,19 +461,34 @@ const Log = {
       }));
 
     const todayStr = DB.getTodayStr();
+    const bodyweight = this._editBodyweight ? parseFloat(this._editBodyweight) : null;
+    const notes = this._editNotes ? this._editNotes.trim() : '';
 
     if (this.editingSessionId) {
       DB.updateSession(user.id, this.editingSessionId, {
         type: this.currentType,
         exercises,
+        bodyweight,
+        notes,
         updatedAt: new Date().toISOString(),
       });
       App.toast('Session updated! 💪', 'success');
     } else {
+      // Calculate duration
+      const durationMinutes = DB.calculateDuration();
+      DB.clearWorkoutStart();
+
+      // Get current program version
+      const programVersion = DB.getCurrentProgramVersion();
+
       DB.addSession(user.id, {
         type: this.currentType,
         date: todayStr,
         exercises,
+        bodyweight,
+        notes,
+        durationMinutes,
+        programVersion,
         createdAt: new Date().toISOString(),
       });
       App.toast('Workout saved! 💪', 'success');
@@ -390,11 +506,13 @@ const Log = {
       DB.deleteSession(user.id, this.editingSessionId);
       App.toast('Session deleted', '');
       this.editingSessionId = null;
+      this.stopRestTimer();
       App.navigate('dashboard');
     }
   },
 
   editSession(sessionId) {
+    this.stopRestTimer();
     this.render(null, sessionId);
     App.navigate('log');
   },
