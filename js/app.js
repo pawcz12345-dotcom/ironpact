@@ -54,7 +54,6 @@ const App = {
           const settings = DB.getSettings();
           settings.userName1 = profile.display_name || settings.userName1;
           settings.unit = profile.unit || settings.unit;
-          // Stash cloud user id and profile for use anywhere in the app
           settings._cloudUserId = userId;
           settings._cloudUsername = profile.username || '';
           settings._cloudDisplayName = profile.display_name || '';
@@ -68,6 +67,9 @@ const App = {
     // Always use user1 as the local DB slot for the signed-in user
     DB.setCurrentUser('user1');
     this._initShell();
+
+    // Re-run header update now that profile is loaded
+    this.updateHeaderUser();
 
     // Token pill
     if (userId && typeof Tokens !== 'undefined') {
