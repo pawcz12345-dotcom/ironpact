@@ -30,12 +30,9 @@ const Dashboard = {
     const program = DB.getProgram();
     const suggestedExercises = program[suggested] || [];
 
-    // Friend data
-    const allUsers = DB.getUsers();
-    const friend = allUsers.find(u => u.id !== user.id);
-    const friendName = friend ? App.getUserName(friend.id) : null;
-    const friendSessions = friend ? DB.getSessions(friend.id)
-      .sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 3) : [];
+    // Friend data — loaded async, rendered separately
+    const friendName = null;
+    const friendSessions = [];
 
     // Today's session check
     const todaySessions = sessions.filter(s => s.date === todayStr);
@@ -139,17 +136,49 @@ const Dashboard = {
       ` : recentSessions.map(s => this.renderSessionItem(s)).join('')}
 
       <!-- Friend Activity -->
-      ${friendName ? `
-        <div class="section-header" style="margin-top: 8px;">
-          <div class="section-title">${friendName}'s Activity</div>
-          <div class="section-action" onclick="App.navigate('compare')">Compare</div>
-        </div>
-        ${friendSessions.length === 0
-          ? `<div class="card card-sm" style="color: var(--text-2); font-size: 14px;">No sessions logged yet</div>`
-          : friendSessions.map(s => this.renderSessionItem(s, true)).join('')
-        }
-      ` : ''}
+      <div id="dashboard-friend-activity"></div>
     `;
+
+    // Load friends async and render friend section
+    this._loadFriendActivity(user);
+  },
+
+  async _loadFriendActivity(user) {
+    const container = document.getElementById('dashboard-friend-activity');
+    if (!container) return;
+    const userId = App.getCloudUserId();
+    if (!userId || typeof Cloud === 'undefined') return;
+
+    const friends = await Cloud.getFriends(userId);
+    if (!friends.length) {
+      container.innerHTML = `
+        <div class="section-header">
+          <div class="section-title">Friends</div>
+          <div class="section-action" onclick="App.navigate('compare')">Add Friend</div>
+        </div>
+        <div class="card card-sm" style="color: var(--text-2); font-size: 14px;">
+          No friends yet — add one on the Compare tab 🤝
+        </div>`;
+      return;
+    }
+
+    // Show most recent friend's last 3 sessions
+    const friend = friends[0];
+    const friendName = friend.display_name || friend.username || 'Friend';
+    const friendSessions = (await Cloud.getSessions(friend.id))
+      .sort((a, b) => new Date(b.date) - new Date(a.date))
+      .slice(0, 3);
+
+    container.innerHTML = `
+      <div class="section-header" style="margin-top:8px;">
+        <div class="section-title">${friendName}'s Activity</div>
+        <div class="section-action" onclick="App.navigate('compare')">Compare</div>
+      </div>
+      ${friendSessions.length === 0
+        ? `<div class="card card-sm" style="color: var(--text-2); font-size: 14px;">No sessions logged yet</div>`
+        : friendSessions.map(s => Dashboard.renderSessionItem(s, true)).join('')}
+    `;
+  },
   },
 
   calcVolumeDelta(thisWeek, lastWeek) {

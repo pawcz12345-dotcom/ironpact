@@ -14,29 +14,32 @@ const Settings = {
     container.innerHTML = `
       <div class="page-title">Settings</div>
 
-      <!-- Users -->
-      <div class="settings-section-title">Players</div>
+      <!-- Profile -->
+      <div class="settings-section-title">Your Profile</div>
 
       <div class="settings-row">
         <div class="settings-row-left">
-          <div class="settings-row-label">🔥 Player 1 Name</div>
+          <div class="settings-row-label">Display Name</div>
+          <div class="settings-row-sub">Shown to friends</div>
         </div>
         <input class="settings-input" type="text"
-               value="${this.escHtml(settings.userName1)}"
-               placeholder="Player 1"
-               style="background: var(--bg-3); border: 1px solid var(--border); color: var(--text); border-radius: var(--radius-sm); padding: 8px 12px; font-size: 15px; font-family: inherit; text-align: right; max-width: 140px;"
-               onchange="Settings.updateSetting('userName1', this.value)">
+               value="${this.escHtml(settings._cloudDisplayName || settings.userName1)}"
+               placeholder="Your name"
+               style="background: var(--bg-3); border: 1px solid var(--border); color: var(--text); border-radius: var(--radius-sm); padding: 8px 12px; font-size: 15px; font-family: inherit; text-align: right; max-width: 160px;"
+               onchange="Settings.updateDisplayName(this.value)">
       </div>
 
       <div class="settings-row">
         <div class="settings-row-left">
-          <div class="settings-row-label">⚡ Player 2 Name</div>
+          <div class="settings-row-label">Username</div>
+          <div class="settings-row-sub">For friend requests</div>
         </div>
         <input class="settings-input" type="text"
-               value="${this.escHtml(settings.userName2)}"
-               placeholder="Player 2"
-               style="background: var(--bg-3); border: 1px solid var(--border); color: var(--text); border-radius: var(--radius-sm); padding: 8px 12px; font-size: 15px; font-family: inherit; text-align: right; max-width: 140px;"
-               onchange="Settings.updateSetting('userName2', this.value)">
+               value="${this.escHtml(settings._cloudUsername || '')}"
+               placeholder="set a username"
+               autocapitalize="none"
+               style="background: var(--bg-3); border: 1px solid var(--border); color: var(--text); border-radius: var(--radius-sm); padding: 8px 12px; font-size: 15px; font-family: inherit; text-align: right; max-width: 160px;"
+               onchange="Settings.updateUsername(this.value)">
       </div>
 
       <!-- Units -->
@@ -152,6 +155,16 @@ const Settings = {
         <div id="token-history-container">
           <div style="color: var(--text-3); font-size: 13px; padding: 8px 0;">Sign in to see your history</div>
         </div>
+      </div>
+
+      <!-- Account -->
+      <div class="settings-section-title">Account</div>
+      <div class="settings-row" style="cursor:pointer;" onclick="Settings.signOut()">
+        <div class="settings-row-left">
+          <div class="settings-row-label">🚪 Sign Out</div>
+          <div class="settings-row-sub">${settings._cloudDisplayName ? `Signed in as ${settings._cloudDisplayName}` : 'Signed in with Google'}</div>
+        </div>
+        <div style="color: var(--danger, #ef4444);">→</div>
       </div>
 
       <!-- About -->
@@ -363,12 +376,54 @@ const Settings = {
     }
   },
 
+  async updateDisplayName(value) {
+    const name = value.trim();
+    if (!name) return;
+    const settings = DB.getSettings();
+    settings.userName1 = name;
+    settings._cloudDisplayName = name;
+    DB.saveSettings(settings);
+    App.updateHeaderUser();
+    const userId = App.getCloudUserId();
+    if (userId && typeof Cloud !== 'undefined') {
+      await Cloud.updateProfile(userId, { display_name: name });
+    }
+    App.toast('Name saved!', 'success');
+  },
+
+  async updateUsername(value) {
+    const username = value.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+    if (!username) return;
+    const userId = App.getCloudUserId();
+    if (!userId || typeof Cloud === 'undefined') {
+      App.toast('Sign in to set a username', 'error');
+      return;
+    }
+    const result = await Cloud.updateProfile(userId, { username });
+    if (result) {
+      const settings = DB.getSettings();
+      settings._cloudUsername = username;
+      DB.saveSettings(settings);
+      App.toast(`Username set: @${username}`, 'success');
+    } else {
+      App.toast('Username taken or invalid', 'error');
+    }
+  },
+
   updateSetting(key, value) {
     const settings = DB.getSettings();
     settings[key] = value;
     DB.saveSettings(settings);
     App.updateHeaderUser();
     App.toast('Saved!', 'success');
+  },
+
+  signOut() {
+    if (typeof Auth !== 'undefined') {
+      if (confirm('Sign out of IronPact?')) {
+        Auth.signOut();
+      }
+    }
   },
 
   setUnit(unit) {

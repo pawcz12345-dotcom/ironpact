@@ -462,7 +462,12 @@ const Log = {
   save() {
     if (!this.validate()) return;
     const user = DB.getCurrentUser();
-    if (!user) { App.toast('Select a user first', 'error'); return; }
+    const cloudUserId = App.getCloudUserId();
+
+    if (!user && !cloudUserId) {
+      App.toast('Sign in to save workouts', 'error');
+      return;
+    }
 
     // Stop rest timer
     this.stopRestTimer();
@@ -478,22 +483,25 @@ const Log = {
     const todayStr = DB.getTodayStr();
     const bodyweight = this._editBodyweight ? parseFloat(this._editBodyweight) : null;
     const notes = this._editNotes ? this._editNotes.trim() : '';
+    const localUserId = user?.id || 'user1';
 
     if (this.editingSessionId) {
-      DB.updateSession(user.id, this.editingSessionId, {
+      const update = {
         type: this.currentType,
         exercises,
         bodyweight,
         notes,
         updatedAt: new Date().toISOString(),
-      });
+      };
+      DB.updateSession(localUserId, this.editingSessionId, update);
+      // Also update in cloud
+      if (cloudUserId && typeof Cloud !== 'undefined') {
+        Cloud.updateSession(cloudUserId, this.editingSessionId, update);
+      }
       App.toast('Session updated! 💪', 'success');
     } else {
-      // Calculate duration
       const durationMinutes = DB.calculateDuration();
       DB.clearWorkoutStart();
-
-      // Get current program version
       const programVersion = DB.getCurrentProgramVersion();
 
       const savedSession = {
@@ -506,12 +514,25 @@ const Log = {
         programVersion,
         createdAt: new Date().toISOString(),
       };
-      DB.addSession(user.id, savedSession);
+
+      // Save locally (for offline/cache use)
+      DB.addSession(localUserId, savedSession);
+
+      // Save to cloud
+      if (cloudUserId && typeof Cloud !== 'undefined') {
+        Cloud.addSession(cloudUserId, savedSession).then(cloudSession => {
+          if (cloudSession) {
+            // Update local record with cloud id for future edits
+            DB.updateSession(localUserId, savedSession.id, { cloudId: cloudSession.id });
+          }
+        });
+      }
+
       App.toast('Workout saved! 💪', 'success');
 
-      // Award tokens (cloud users only)
-      if (typeof Tokens !== 'undefined' && typeof Auth !== 'undefined' && Auth.currentUser) {
-        Tokens.onSessionSaved(Auth.currentUser.id, savedSession);
+      // Award tokens
+      if (typeof Tokens !== 'undefined' && cloudUserId) {
+        Tokens.onSessionSaved(cloudUserId, savedSession);
       }
     }
 
@@ -522,9 +543,14 @@ const Log = {
   deleteSession() {
     if (!this.editingSessionId) return;
     const user = DB.getCurrentUser();
-    if (!user) return;
+    const cloudUserId = App.getCloudUserId();
+    if (!user && !cloudUserId) return;
     if (confirm('Delete this session?')) {
-      DB.deleteSession(user.id, this.editingSessionId);
+      const localUserId = user?.id || 'user1';
+      DB.deleteSession(localUserId, this.editingSessionId);
+      if (cloudUserId && typeof Cloud !== 'undefined') {
+        Cloud.deleteSession(cloudUserId, this.editingSessionId);
+      }
       App.toast('Session deleted', '');
       this.editingSessionId = null;
       this.stopRestTimer();
