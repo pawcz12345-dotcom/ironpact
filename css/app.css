@@ -1361,49 +1361,198 @@ select {
 .mb-16 { margin-bottom: 16px; }
 .mb-8 { margin-bottom: 8px; }
 
-/* Planned workout banner */
-.planned-banner {
-  background: linear-gradient(135deg, rgba(255,107,43,0.15), rgba(255,107,43,0.05));
-  border: 1px solid var(--border-accent);
-  border-radius: var(--radius);
-  padding: 20px;
-  margin-bottom: 16px;
-  position: relative;
-  overflow: hidden;
-}
+/* ============================================
+   Dashboard — new design
+   ============================================ */
 
-.planned-banner::before {
-  content: '';
-  position: absolute;
-  top: -20px;
-  right: -20px;
-  width: 100px;
-  height: 100px;
-  background: radial-gradient(circle, rgba(255,107,43,0.2), transparent 70%);
+.dash-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding: 4px 0;
 }
-
-.planned-banner-label {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--accent);
+.dash-greeting {
+  font-size: 13px;
+  color: var(--text-3);
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 1px;
-  margin-bottom: 8px;
+  letter-spacing: 0.5px;
+  margin-bottom: 2px;
 }
-
-.planned-banner-type {
+.dash-name {
   font-size: 28px;
   font-weight: 900;
-  letter-spacing: -1px;
-  text-transform: capitalize;
-  margin-bottom: 4px;
+  letter-spacing: -0.5px;
+  line-height: 1.1;
 }
-
-.planned-banner-exercises {
+.dash-sub {
   font-size: 13px;
   color: var(--text-2);
-  margin-bottom: 16px;
+  margin-top: 4px;
 }
+.dash-start-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: linear-gradient(135deg, var(--accent), #ff9a5c);
+  border: none;
+  border-radius: 16px;
+  padding: 12px 16px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #fff;
+  cursor: pointer;
+  min-width: 76px;
+  text-align: center;
+  box-shadow: 0 4px 16px rgba(255,107,43,0.35);
+  transition: transform 0.1s, box-shadow 0.1s;
+  flex-shrink: 0;
+}
+.dash-start-btn:active { transform: scale(0.96); box-shadow: 0 2px 8px rgba(255,107,43,0.2); }
+.dash-done-badge {
+  background: rgba(0,230,118,0.15);
+  border: 1px solid rgba(0,230,118,0.3);
+  color: var(--success);
+  border-radius: 12px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* Stats row */
+.dash-stats-row {
+  display: flex;
+  align-items: center;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 12px;
+  margin-bottom: 20px;
+}
+.dash-stat {
+  flex: 1;
+  text-align: center;
+}
+.dash-stat-value {
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.5px;
+}
+.dash-stat-label {
+  font-size: 10px;
+  color: var(--text-3);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 4px;
+}
+.dash-stat-divider {
+  width: 1px;
+  height: 32px;
+  background: var(--border);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+/* Section labels */
+.dash-section-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-bottom: 10px;
+}
+.dash-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+/* Activity graph card */
+.dash-activity-card {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 20px;
+}
+.dash-activity-footer {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-3);
+  margin-top: 8px;
+}
+
+/* Next workout card */
+.dash-next-card {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+.dash-next-card:active { background: var(--bg-3); }
+.dash-next-left { flex: 1; }
+.dash-next-type {
+  font-size: 16px;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+.dash-next-exercises {
+  font-size: 12px;
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* PR card */
+.dash-pr-card {
+  background: linear-gradient(135deg, rgba(255,204,0,0.12), rgba(255,204,0,0.04));
+  border: 1px solid rgba(255,204,0,0.2);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.dash-pr-icon { font-size: 28px; flex-shrink: 0; }
+.dash-pr-info { flex: 1; min-width: 0; }
+.dash-pr-lift {
+  font-size: 13px;
+  color: var(--text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 2px;
+}
+.dash-pr-value {
+  font-size: 24px;
+  font-weight: 900;
+  color: var(--warning);
+  letter-spacing: -0.5px;
+}
+.dash-pr-total { text-align: right; flex-shrink: 0; color: var(--warning); }
+
+/* Keep old planned-banner for reference (unused now) */
+.planned-banner {
+  display: none;
+}
+
+
 
 /* Date picker for compare */
 .date-scroll {
