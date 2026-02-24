@@ -224,9 +224,16 @@ const App = {
     const el = document.getElementById('header-user');
     if (!el) return;
 
-    // Prefer cloud profile name
+    // Try sources in priority order: cloud profile → local settings → auth metadata → fallback
     const settings = DB.getSettings();
-    const displayName = settings._cloudDisplayName || settings.userName1 || 'You';
+    const displayName =
+      settings._cloudDisplayName ||
+      Auth?.currentProfile?.display_name ||
+      Auth?.currentUser?.user_metadata?.full_name ||
+      Auth?.currentUser?.email?.split('@')[0] ||
+      settings.userName1 ||
+      'You';
+
     const user = DB.getCurrentUser();
     const emoji = user?.emoji || '🔥';
 

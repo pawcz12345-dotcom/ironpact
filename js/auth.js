@@ -74,6 +74,9 @@ const Auth = (() => {
       _hideAuthOverlay();
       _hideLoading();
 
+      // Update header immediately with whatever we have (name from Google metadata)
+      if (typeof App !== 'undefined') App.updateHeaderUser();
+
       // Trigger onboarding for brand-new users (profile has default name "Lifter")
       if (currentProfile && currentProfile.display_name === 'Lifter' && !currentProfile.username) {
         setTimeout(() => {
