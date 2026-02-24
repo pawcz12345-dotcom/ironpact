@@ -62,21 +62,19 @@ Deno.serve(async (req) => {
     // ── Build smart prompt ──────────────────────────────────────────────────
     const prompt = buildPrompt(exercise_name, history, unit || 'kg');
 
-    // ── Call OpenAI ─────────────────────────────────────────────────────────
-    const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+    // ── Call Claude ─────────────────────────────────────────────────────────
+    const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+        'x-api-key': Deno.env.get('ANTHROPIC_API_KEY'),
+        'anthropic-version': '2023-06-01',
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        temperature: 0.4,
+        model: 'claude-haiku-4-5',
         max_tokens: 400,
-        messages: [
-          {
-            role: 'system',
-            content: `You are an expert strength coach. Analyse workout data and give precise, 
+        temperature: 0.4,
+        system: `You are an expert strength coach. Analyse workout data and give precise, 
 actionable progressive overload recommendations. Be concise and specific — give exact numbers.
 Respond in JSON with this exact shape:
 {
@@ -89,20 +87,18 @@ Respond in JSON with this exact shape:
   "trend": "progressing" | "stalling" | "regressing" | "insufficient_data",
   "warning": "string or null — flag if RIR is too low (potential overtraining) or pattern is concerning"
 }`,
-          },
-          { role: 'user', content: prompt },
-        ],
+        messages: [{ role: 'user', content: prompt }],
       }),
     });
 
-    if (!openaiRes.ok) {
-      const errText = await openaiRes.text();
-      console.error('OpenAI error:', errText);
+    if (!claudeRes.ok) {
+      const errText = await claudeRes.text();
+      console.error('Claude error:', errText);
       return error('AI service error');
     }
 
-    const openaiData = await openaiRes.json();
-    const raw = openaiData.choices?.[0]?.message?.content;
+    const claudeData = await claudeRes.json();
+    const raw = claudeData.content?.[0]?.text;
     if (!raw) return error('Empty AI response');
 
     // Parse the JSON from the AI
