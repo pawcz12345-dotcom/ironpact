@@ -361,25 +361,31 @@ const Cloud = (() => {
     const sb = _sb();
     if (!sb || !userId) return [];
     try {
-      const { data, error } = await sb
+      // Step 1: get accepted connections involving this user
+      const { data: conns, error: connErr } = await sb
         .from('friend_connections')
-        .select(`
-          id,
-          status,
-          requester_id,
-          addressee_id,
-          created_at,
-          requester:profiles!friend_connections_requester_id_fkey(id, display_name, username, emoji, unit),
-          addressee:profiles!friend_connections_addressee_id_fkey(id, display_name, username, emoji, unit)
-        `)
+        .select('id, requester_id, addressee_id')
         .eq('status', 'accepted')
         .or(`requester_id.eq.${userId},addressee_id.eq.${userId}`);
-      if (error) throw error;
+      if (connErr) throw connErr;
+      if (!conns || !conns.length) return [];
 
-      // Return the friend profile (not the user themselves)
-      return (data || []).map(conn => {
-        const friend = conn.requester_id === userId ? conn.addressee : conn.requester;
-        return { connectionId: conn.id, ...friend };
+      // Step 2: collect friend ids
+      const friendIds = conns.map(c =>
+        c.requester_id === userId ? c.addressee_id : c.requester_id
+      );
+
+      // Step 3: fetch friend profiles
+      const { data: profiles, error: profErr } = await sb
+        .from('profiles')
+        .select('id, display_name, username, emoji, unit')
+        .in('id', friendIds);
+      if (profErr) throw profErr;
+
+      // Map connection id back onto each profile
+      return (profiles || []).map(p => {
+        const conn = conns.find(c => c.requester_id === p.id || c.addressee_id === p.id);
+        return { connectionId: conn?.id, ...p };
       });
     } catch (err) {
       _err('getFriends', err);

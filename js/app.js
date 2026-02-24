@@ -208,7 +208,11 @@ const App = {
     switch (page) {
       case 'dashboard': Dashboard.render(); break;
       case 'log': Log.render(); break;
-      case 'compare': Compare.render(); break;
+      case 'compare': Compare.render().catch(e => {
+        console.error('[Compare] render error:', e);
+        const c = document.getElementById('page-compare');
+        if (c) c.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-title">Something went wrong</div><div class="empty-body">${e.message}</div></div>`;
+      }); break;
       case 'progress': Progress.render(); break;
       case 'settings': Settings.render(); break;
     }
