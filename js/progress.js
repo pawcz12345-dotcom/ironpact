@@ -626,6 +626,8 @@ const Progress = {
         const bestE1RM = bestSet
           ? DB.calcE1RM(bestSet.weight, bestSet.reps)
           : 0;
+        const aiContainerId = `ai-result-${ex.name.replace(/\s+/g, '-').toLowerCase()}`;
+        const exHistory = DB.getExerciseHistory(user.id, ex.name);
 
         return `
           <div class="card card-sm" style="margin-bottom: 12px;">
@@ -647,6 +649,14 @@ const Progress = {
                 ${set.isPR ? '<span class="badge badge-pr">🏆 PR</span>' : '<span></span>'}
               </div>
             `}).join('')}
+
+            <!-- AI progressive overload button (only if 2+ sessions for this exercise) -->
+            ${exHistory.length >= 2 && typeof AI !== 'undefined' ? `
+              <div style="margin-top: 14px;">
+                ${AI.renderOverloadButton(ex.name)}
+                <div id="${aiContainerId}" class="ai-result-container"></div>
+              </div>
+            ` : ''}
           </div>
         `;
       }).join('')}

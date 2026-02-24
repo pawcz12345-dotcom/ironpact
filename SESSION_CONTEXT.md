@@ -5,21 +5,24 @@ A PWA workout tracker at /home/ubuntu/.openclaw/workspace/gymbuddy/
 GitHub Pages: https://pawcz12345-dotcom.github.io/ironpact/
 GitHub repo: https://github.com/pawcz12345-dotcom/ironpact
 
-## Current State (as of 2026-02-23)
+## Current State (as of 2026-02-24)
 - Push/Pull/Legs/Core tracking
 - e1RM (Epley formula), RIR per set
 - Volume charts, heatmap, donut chart, session volume trend
-- Compare page (head-to-head, dropdown session pickers)
+- Compare page (cloud friends, head-to-head stats, session picker)
 - CSV import (DD/MM/YYYY, groups by date+type)
 - Program versioning + history
 - Rest timer pill, bodyweight tracking, session notes
 - Historical data import (JSON + CSV)
-- Onboarding wizard (first launch)
+- Onboarding wizard (display name + username, syncs to cloud)
 - Delete session (progress detail + log edit)
 - Remove set button + RIR input in log
 - Empty states on progress page
 - **Supabase auth (Google Sign-In working)**
-- **Cloud DB layer (cloud.js) — coexists with localStorage DB.js**
+- **Cloud DB layer (cloud.js) — sessions save to both localStorage + Supabase**
+- **Single account mode — no more 2-player local, friends via cloud**
+- **Token system — earn on log (+1), PR (+2), streak (+5), pill in header, history in settings**
+- **Dashboard redesign — hero greeting, stats row, 8-week activity graph, next workout card, PR highlight**
 
 ## Supabase
 - URL: https://pwmqljgqifypjkhezaex.supabase.co
