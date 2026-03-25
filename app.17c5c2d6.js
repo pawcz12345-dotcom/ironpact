@@ -2363,6 +2363,7 @@ async function sbLoadProfile() {
             avatar_url: e.avatar_url || "",
             height_cm: e.height_cm,
             weight_kg: e.weight_kg,
+            body_weight: e.body_weight || e.weight_kg,
             current_streak: e.current_streak || 0,
             longest_streak: e.longest_streak || 0,
             total_workouts: e.total_workouts || 0,
@@ -7003,8 +7004,9 @@ function renderTokenBadge(){const e=AppState.profile.is_beta_user;return`\n    <
       var bw = parseFloat(inp.value);
       if (isNaN(bw) || bw <= 0) return;
       AppState.profile.body_weight = bw;
+      AppState.profile.weight_kg = bw;
       if (!isDemoMode && supabaseClient && AppState.user) {
-        sbUpdateProfile({ body_weight: bw, updated_at: new Date().toISOString() });
+        sbUpdateProfile({ weight_kg: bw, body_weight: bw, updated_at: new Date().toISOString() });
       }
     }, true);
   };
@@ -7043,8 +7045,9 @@ function renderTokenBadge(){const e=AppState.profile.is_beta_user;return`\n    <
               var bw = parseFloat(val);
               if (!isNaN(bw) && bw > 0) {
                 AppState.profile.body_weight = bw;
+                AppState.profile.weight_kg = bw;
                 if (!isDemoMode && supabaseClient && AppState.user) {
-                  sbUpdateProfile({ body_weight: bw, updated_at: new Date().toISOString() });
+                  sbUpdateProfile({ weight_kg: bw, body_weight: bw, updated_at: new Date().toISOString() });
                 }
               }
             }
@@ -7145,8 +7148,9 @@ function renderTokenBadge(){const e=AppState.profile.is_beta_user;return`\n    <
           var bw = parseFloat(val);
           if (!isNaN(bw) && bw > 0) {
             AppState.profile.body_weight = bw;
+            AppState.profile.weight_kg = bw;
             if (!isDemoMode && supabaseClient && AppState.user) {
-              sbUpdateProfile({ body_weight: bw, updated_at: new Date().toISOString() });
+              sbUpdateProfile({ weight_kg: bw, body_weight: bw, updated_at: new Date().toISOString() });
             }
           }
         }
