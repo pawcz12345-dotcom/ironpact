@@ -6970,3 +6970,26 @@ function renderTokenBadge(){const e=AppState.profile.is_beta_user;return`\n    <
     return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   }
 })();
+
+// ═══════════════════════════════════════════════════════════════
+// PATCH: Debug friend feed (temporary)
+// ═══════════════════════════════════════════════════════════════
+(function(){
+  var _orig = sbLoadFriendWorkouts;
+  sbLoadFriendWorkouts = async function sbLoadFriendWorkouts(friendUserId) {
+    console.log('[Feed] Loading workouts for user:', friendUserId);
+    if (!friendUserId) { console.warn('[Feed] No friendUserId provided'); return []; }
+    // Direct query with logging
+    try {
+      const { data, error } = await supabaseClient
+        .from('workouts')
+        .select('id, name, started_at, duration_minutes')
+        .eq('user_id', friendUserId)
+        .limit(5);
+      console.log('[Feed] Simple workouts query result:', { data, error, friendUserId });
+    } catch(e) { console.error('[Feed] Query threw:', e); }
+    var result = await _orig(friendUserId);
+    console.log('[Feed] sbLoadFriendWorkouts result:', result);
+    return result;
+  };
+})();
