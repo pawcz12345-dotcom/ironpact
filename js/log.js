@@ -9,6 +9,8 @@ const Log = {
   restTimerInterval: null,
   restTimerSeconds: 0,
   restTimerActive: false,
+  _workoutInProgress: false,
+  _editDuration: null,
 
   render(type = null, sessionId = null) {
     this.editingSessionId = sessionId;
@@ -36,15 +38,18 @@ const Log = {
         this.exercises = JSON.parse(JSON.stringify(session.exercises || []));
         this._editBodyweight = session.bodyweight || '';
         this._editNotes = session.notes || '';
+        this._editDuration = session.durationMinutes || '';
       }
     } else {
       this.currentType = type || DB.getSuggestedWorkout();
       this._editBodyweight = '';
       this._editNotes = '';
+      this._editDuration = null;
       // Load from program
       this.loadFromProgram(this.currentType);
       // Record start time
       DB.setWorkoutStart();
+      this._workoutInProgress = false;
     }
 
     container.innerHTML = this.buildHTML();
@@ -55,10 +60,13 @@ const Log = {
   loadFromProgram(type) {
     const program = DB.getProgram();
     const exercises = program[type] || [];
-    this.exercises = exercises.map(ex => ({
-      name: ex.name,
-      sets: [this.newSet()],
-    }));
+    const savedBW = DB.getSettings().bodyweight;
+    this.exercises = exercises.map(ex => {
+      const isBW = typeof ExerciseCatalog !== 'undefined' && ExerciseCatalog.isBodyweight(ex.name);
+      const set = this.newSet();
+      if (isBW && savedBW) set.weight = String(savedBW);
+      return { name: ex.name, sets: [set] };
+    });
   },
 
   buildHTML() {
@@ -88,6 +96,17 @@ const Log = {
                id="bodyweight-input"
                onchange="Log.updateBodyweight(this.value)">
       </div>
+
+      ${this.editingSessionId ? `
+      <!-- Duration (editing only) -->
+      <div class="bodyweight-field">
+        <label class="bodyweight-label">Duration (minutes)</label>
+        <input class="bodyweight-input" type="number" inputmode="numeric"
+               placeholder="e.g. 45"
+               value="${this._editDuration || ''}"
+               onchange="Log.updateDuration(this.value)">
+      </div>
+      ` : ''}
 
       <!-- Exercises -->
       <div id="exercises-list">
@@ -164,6 +183,8 @@ const Log = {
 
   renderSetRow(exIdx, setIdx, set) {
     const unit = App.getUnit();
+    const exName = this.exercises[exIdx]?.name || '';
+    const isBW = typeof ExerciseCatalog !== 'undefined' && ExerciseCatalog.isBodyweight(exName);
     const vol = set.weight && set.reps
       ? Math.round(parseFloat(set.weight) * parseInt(set.reps))
       : '-';
@@ -172,10 +193,10 @@ const Log = {
       : 0;
     return `
       <div class="set-row" id="set-${exIdx}-${setIdx}">
-        <div class="set-num ${set.isPR ? 'is-pr' : ''}" id="set-num-${exIdx}-${setIdx}">${setIdx + 1}</div>
-        <input class="set-input" type="number" 
-               inputmode="decimal" 
-               placeholder="0"
+        <div class="set-num ${set.isPR ? 'is-pr' : ''}" id="set-num-${exIdx}-${setIdx}">${setIdx + 1}${isBW ? '<span style="font-size:9px;" title="Bodyweight exercise">🏋️</span>' : ''}</div>
+        <input class="set-input" type="number"
+               inputmode="decimal"
+               placeholder="${isBW ? 'BW' : '0'}"
                value="${set.weight || ''}"
                onchange="Log.updateSet(${exIdx}, ${setIdx}, 'weight', this.value)"
                id="set-w-${exIdx}-${setIdx}">
@@ -223,16 +244,30 @@ const Log = {
     // Nothing extra needed — all handlers are inline
   },
 
+  resume() {
+    // Re-show the rest timer pill if timer is active (after tab switch back)
+    if (this.restTimerActive) {
+      this.showRestTimerPill();
+    }
+  },
+
   updateBodyweight(value) {
     this._editBodyweight = value;
+    this._workoutInProgress = true;
   },
 
   updateNotes(value) {
     this._editNotes = value;
+    this._workoutInProgress = true;
+  },
+
+  updateDuration(value) {
+    this._editDuration = value;
   },
 
   updateExerciseName(idx, value) {
     this.exercises[idx].name = value;
+    this._workoutInProgress = true;
     this.updateSuggestions(idx, value);
   },
 
@@ -275,6 +310,12 @@ const Log = {
         if (ex.name) allNames.add(ex.name);
       }
     }
+    // Also from exercise catalog
+    if (typeof ExerciseCatalog !== 'undefined') {
+      for (const ex of ExerciseCatalog.search(value, 20)) {
+        allNames.add(ex.name);
+      }
+    }
 
     const matches = [...allNames].filter(n =>
       n.toLowerCase().includes(value.toLowerCase()) &&
@@ -300,9 +341,80 @@ const Log = {
     if (input) input.value = name;
     const el = document.getElementById(`suggestions-${idx}`);
     if (el) el.style.display = 'none';
+
+    // Auto-fill bodyweight for bodyweight exercises
+    if (typeof ExerciseCatalog !== 'undefined' && ExerciseCatalog.isBodyweight(name)) {
+      const savedBW = DB.getSettings().bodyweight;
+      if (savedBW) {
+        let changed = false;
+        for (const set of this.exercises[idx].sets) {
+          if (!set.weight) { set.weight = String(savedBW); changed = true; }
+        }
+        if (changed) {
+          // Re-render this exercise's sets
+          const container = document.getElementById(`sets-${idx}`);
+          if (container) {
+            container.innerHTML = this.exercises[idx].sets.map((s, si) => this.renderSetRow(idx, si, s)).join('');
+          }
+        }
+      } else {
+        this._showBodyweightPrompt(idx);
+      }
+    }
+  },
+
+  _showBodyweightPrompt(exIdx) {
+    const unit = App.getUnit();
+    const existing = document.getElementById('bw-prompt-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'bw-prompt-overlay';
+    overlay.className = 'overlay open';
+    overlay.innerHTML = `
+      <div class="overlay-sheet" style="max-height:50vh;">
+        <div class="overlay-handle"></div>
+        <div style="font-size:24px; text-align:center; margin-bottom:8px;">🏋️</div>
+        <div class="overlay-title" style="text-align:center; font-size:18px;">Enter Your Bodyweight</div>
+        <div style="font-size:13px; color:var(--text-2); text-align:center; margin-bottom:16px;">
+          This is a bodyweight exercise. We need your weight to track volume.
+        </div>
+        <input id="bw-prompt-input" class="input" type="number" inputmode="decimal"
+               placeholder="e.g. 80" style="margin-bottom:16px; text-align:center; font-size:18px;">
+        <div style="font-size:11px; color:var(--text-3); text-align:center; margin-bottom:16px;">Weight in ${unit}</div>
+        <button class="btn btn-primary" onclick="Log._confirmBodyweightPrompt(${exIdx})" style="width:100%;">Save</button>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    setTimeout(() => document.getElementById('bw-prompt-input')?.focus(), 200);
+  },
+
+  _confirmBodyweightPrompt(exIdx) {
+    const input = document.getElementById('bw-prompt-input');
+    const value = parseFloat(input?.value);
+    const overlay = document.getElementById('bw-prompt-overlay');
+    if (overlay) overlay.remove();
+
+    if (!value || value <= 0) return;
+
+    // Save to settings
+    const settings = DB.getSettings();
+    settings.bodyweight = value;
+    DB.saveSettings(settings);
+
+    // Auto-fill sets
+    for (const set of this.exercises[exIdx].sets) {
+      if (!set.weight) set.weight = String(value);
+    }
+    const container = document.getElementById(`sets-${exIdx}`);
+    if (container) {
+      container.innerHTML = this.exercises[exIdx].sets.map((s, si) => this.renderSetRow(exIdx, si, s)).join('');
+    }
+    App.toast('Bodyweight saved!', 'success');
   },
 
   addExercise() {
+    this._workoutInProgress = true;
     this.exercises.push({ name: '', sets: [this.newSet()] });
     const container = document.getElementById('exercises-list');
     if (container) {
@@ -338,9 +450,16 @@ const Log = {
   },
 
   addSet(exIdx) {
+    this._workoutInProgress = true;
     const sets = this.exercises[exIdx].sets;
     const prevSet = sets[sets.length - 1];
     const newSet = this.newSet(prevSet);
+    // Auto-fill bodyweight if no previous weight
+    if (!newSet.weight && typeof ExerciseCatalog !== 'undefined'
+        && ExerciseCatalog.isBodyweight(this.exercises[exIdx].name)) {
+      const savedBW = DB.getSettings().bodyweight;
+      if (savedBW) newSet.weight = String(savedBW);
+    }
     sets.push(newSet);
 
     const container = document.getElementById(`sets-${exIdx}`);
@@ -361,6 +480,7 @@ const Log = {
   },
 
   updateSet(exIdx, setIdx, field, value) {
+    this._workoutInProgress = true;
     const set = this.exercises[exIdx].sets[setIdx];
     set[field] = value;
 
@@ -493,6 +613,9 @@ const Log = {
         notes,
         updatedAt: new Date().toISOString(),
       };
+      if (this._editDuration) {
+        update.durationMinutes = parseInt(this._editDuration);
+      }
       DB.updateSession(localUserId, this.editingSessionId, update);
       // Also update in cloud
       if (cloudUserId && typeof Cloud !== 'undefined') {
@@ -534,9 +657,15 @@ const Log = {
       if (typeof Tokens !== 'undefined' && cloudUserId) {
         Tokens.onSessionSaved(cloudUserId, savedSession);
       }
+
+      // Check missions
+      if (typeof Missions !== 'undefined') {
+        Missions.onSessionSaved();
+      }
     }
 
     this.editingSessionId = null;
+    this._workoutInProgress = false;
     App.navigate('dashboard');
   },
 
@@ -553,6 +682,7 @@ const Log = {
       }
       App.toast('Session deleted', '');
       this.editingSessionId = null;
+      this._workoutInProgress = false;
       this.stopRestTimer();
       App.navigate('dashboard');
     }

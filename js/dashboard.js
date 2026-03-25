@@ -91,6 +91,9 @@ const Dashboard = {
         </div>
       </div>
 
+      <!-- Missions -->
+      <div id="dashboard-missions"></div>
+
       <!-- Activity graph (8-week sparkline) -->
       <div class="dash-section-label">Activity</div>
       <div class="dash-activity-card">
@@ -145,6 +148,11 @@ const Dashboard = {
       <div style="height:8px;"></div>
     `;
 
+    if (typeof Missions !== 'undefined') {
+      const missionEl = document.getElementById('dashboard-missions');
+      if (missionEl) missionEl.innerHTML = Missions.renderDashboardSection();
+    }
+
     this._loadFriendActivity(user);
   },
 
@@ -171,21 +179,64 @@ const Dashboard = {
       return;
     }
 
-    const friend = friends[0];
-    const friendName = friend.display_name || friend.username || 'Friend';
-    const friendSessions = (await Cloud.getSessions(friend.id))
-      .sort((a, b) => new Date(b.date) - new Date(a.date))
-      .slice(0, 2);
+    // Fetch recent sessions from ALL friends
+    const feedItems = [];
+    await Promise.all(friends.map(async (friend) => {
+      const friendName = friend.display_name || friend.username || 'Friend';
+      const friendEmoji = friend.emoji || '⚡';
+      try {
+        const sessions = (await Cloud.getSessions(friend.id))
+          .sort((a, b) => new Date(b.date) - new Date(a.date))
+          .slice(0, 3);
+        for (const s of sessions) {
+          feedItems.push({ ...s, friendName, friendEmoji, friendId: friend.id });
+        }
+      } catch (e) {
+        console.warn('[Dashboard] Could not load sessions for', friendName, e);
+      }
+    }));
+
+    // Sort combined feed by date descending
+    feedItems.sort((a, b) => new Date(b.date) - new Date(a.date));
+    const recentFeed = feedItems.slice(0, 8);
 
     container.innerHTML = `
       <div class="dash-section-header">
-        <div class="dash-section-label" style="margin-bottom:0;">${friendName}</div>
+        <div class="dash-section-label" style="margin-bottom:0;">Friend Activity</div>
         <div class="section-action" onclick="App.navigate('compare')">Compare →</div>
       </div>
-      ${friendSessions.length === 0
-        ? `<div class="card card-sm" style="color:var(--text-2); font-size:14px;">No sessions yet</div>`
-        : friendSessions.map(s => Dashboard.renderSessionItem(s, true)).join('')}
+      ${recentFeed.length === 0
+        ? `<div class="card card-sm" style="color:var(--text-2); font-size:14px; text-align:center; padding:24px;">No sessions from friends yet</div>`
+        : recentFeed.map(item => this._renderFeedItem(item)).join('')}
     `;
+  },
+
+  _renderFeedItem(item) {
+    const exerciseCount = (item.exercises || []).length;
+    const setCount = (item.exercises || []).reduce((s, e) => s + (e.sets || []).length, 0);
+    const totalVol = (item.exercises || []).reduce((total, ex) =>
+      total + (ex.sets || []).reduce((s, set) =>
+        s + (parseFloat(set.weight)||0) * (parseInt(set.reps)||0), 0), 0);
+    const hasPR = (item.exercises || []).some(e => (e.sets || []).some(s => s.isPR));
+    const duration = item.durationMinutes ? `${item.durationMinutes}m` : '';
+
+    return `
+      <div class="session-item" style="cursor:default; opacity:0.85;">
+        <div class="session-icon ${item.type}">${App.typeEmoji(item.type)}</div>
+        <div class="session-info">
+          <div class="session-name">
+            <span style="color:var(--accent-2);">${item.friendEmoji} ${item.friendName}</span>
+            · ${item.type.charAt(0).toUpperCase() + item.type.slice(1)}
+          </div>
+          <div class="session-meta">
+            ${App.formatDate(item.date)} · ${exerciseCount} ex · ${setCount} sets${duration ? ' · ' + duration : ''}
+            · ${App.formatVolume(Math.round(totalVol))} vol
+          </div>
+        </div>
+        <div class="session-right">
+          ${hasPR ? '<span class="badge badge-pr">🏆 PR</span>' : `<span class="badge badge-${item.type}">${item.type}</span>`}
+        </div>
+      </div>`;
   },
 
   calcVolumeDelta(thisWeek, lastWeek) {

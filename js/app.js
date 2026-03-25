@@ -203,13 +203,15 @@ const App = {
 
     this.currentPage = page;
 
-    if (page !== 'log' && typeof Log !== 'undefined') {
-      Log.stopRestTimer();
-    }
-
     switch (page) {
       case 'dashboard': Dashboard.render(); break;
-      case 'log': Log.render(); break;
+      case 'log':
+        if (typeof Log !== 'undefined' && Log._workoutInProgress) {
+          Log.resume();
+        } else {
+          Log.render();
+        }
+        break;
       case 'compare': Compare.render().catch(e => {
         console.error('[Compare] render error:', e);
         const c = document.getElementById('page-compare');
