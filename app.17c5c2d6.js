@@ -6970,3 +6970,108 @@ function renderTokenBadge(){const e=AppState.profile.is_beta_user;return`\n    <
     return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   }
 })();
+
+// ═══════════════════════════════════════════════════════════════
+// PATCH v4: Bodyweight Exercise Auto-fill + Profile Field
+// ═══════════════════════════════════════════════════════════════
+
+// 1. Add Body Weight field to Profile settings form
+(function(){
+  var _origRP = renderProfile;
+  renderProfile = function renderProfile(container) {
+    _origRP(container);
+    var form = container.querySelector('#profile-form');
+    if (!form || form.querySelector('#profile-bodyweight')) return;
+
+    var isImperial = AppState.unitPref === 'imperial' || AppState.profile.unit_pref === 'imperial';
+    var u = isImperial ? 'lbs' : 'kg';
+    var current = AppState.profile.body_weight || AppState.profile.weight_kg || '';
+
+    var div = document.createElement('div');
+    div.className = 'form-group';
+    div.innerHTML = '<label class="form-label">Body Weight (' + u + ')</label>' +
+      '<input type="number" class="form-input" id="profile-bodyweight" placeholder="e.g. ' +
+      (isImperial ? '175' : '80') + '" min="30" max="600" step="0.1" value="' + current + '">';
+    var submitBtn = form.querySelector('[type="submit"]');
+    if (submitBtn) form.insertBefore(div, submitBtn);
+    else form.appendChild(div);
+
+    // Capture-phase submit so it runs alongside the original handler
+    form.addEventListener('submit', function() {
+      var inp = document.getElementById('profile-bodyweight');
+      if (!inp) return;
+      var bw = parseFloat(inp.value);
+      if (isNaN(bw) || bw <= 0) return;
+      AppState.profile.body_weight = bw;
+      if (!isDemoMode && supabaseClient && AppState.user) {
+        sbUpdateProfile({ body_weight: bw, updated_at: new Date().toISOString() });
+      }
+    }, true);
+  };
+})();
+
+// 2. Auto-fill bodyweight when a bodyweight exercise is added from the picker
+(function(){
+  var _origRNW = renderNewWorkout;
+  renderNewWorkout = function renderNewWorkout(container) {
+    _origRNW(container);
+    _patchBWPicker(container);
+  };
+
+  function _patchBWPicker(container) {
+    var _origPicker = window.showExercisePicker;
+    if (!_origPicker) return;
+    window.showExercisePicker = function() {
+      _origPicker.apply(this, arguments);
+      setTimeout(function() {
+        var modal = document.getElementById('exercise-picker-modal');
+        if (!modal) return;
+        modal.addEventListener('click', function(e) {
+          var item = e.target.closest('.modal-exercise-item');
+          if (!item) return;
+          var eid = item.dataset.eid;
+          var ex = (AppState.exercises || []).find(function(x) { return x.id === eid; });
+          if (!ex || (ex.equipment || '').toLowerCase() !== 'bodyweight') return;
+
+          // Prompt for bodyweight if not set
+          var hasBW = !!(AppState.profile.body_weight || AppState.profile.weight_kg);
+          if (!hasBW) {
+            var isImperial = AppState.unitPref === 'imperial' || AppState.profile.unit_pref === 'imperial';
+            var u = isImperial ? 'lbs' : 'kg';
+            var val = window.prompt('Enter your body weight (' + u + ') to auto-fill this exercise:', '');
+            if (val) {
+              var bw = parseFloat(val);
+              if (!isNaN(bw) && bw > 0) {
+                AppState.profile.body_weight = bw;
+                if (!isDemoMode && supabaseClient && AppState.user) {
+                  sbUpdateProfile({ body_weight: bw, updated_at: new Date().toISOString() });
+                }
+              }
+            }
+          }
+
+          // After the original handler adds the exercise + calls render(), fix weight if 0
+          setTimeout(function() {
+            if (!AppState.activeWorkout) return;
+            var exes = AppState.activeWorkout.exercises;
+            var last = exes[exes.length - 1];
+            if (!last || last.exercise_id !== eid) return;
+            var bwKg = getBodyweightKg();
+            var changed = false;
+            (last.sets || []).forEach(function(s) {
+              if (!s.weight_kg || s.weight_kg === 0) {
+                s.weight_kg = bwKg;
+                s._displayWeight = Math.round(10 * kgToDisplay(bwKg)) / 10;
+                changed = true;
+              }
+            });
+            if (changed) {
+              var vc = document.getElementById('view-container');
+              if (vc) renderNewWorkout(vc);
+            }
+          }, 0);
+        }, true);
+      }, 50);
+    };
+  }
+})();
