@@ -8,8 +8,11 @@
  */
 
 (function () {
-  const SUPABASE_URL = 'https://vgqyuvwpuicazztranch.supabase.co';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZncXl1dndwdWljYXp6dHJhbmNoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyMTMzMTUsImV4cCI6MjA4Nzc4OTMxNX0.7EU74dzKoefU1lZTR2wjTQVUgIZbAiGd2MqQ7YIZtPw';
+  const SUPABASE_URL = 'https://pwmqljgqifypjkhezaex.supabase.co';
+  const SUPABASE_ANON_KEY =
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.' +
+    'eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB3bXFsamdxaWZ5cGpraGV6YWV4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE4ODgyNzMsImV4cCI6MjA4NzQ2NDI3M30.' +
+    'bIEGLOJ5FgubHDlHz2xUKNyIAp6y9Yn_x0igbaQ287o';
 
   if (!window.supabase) {
     console.error('[IronPact] Supabase CDN script not loaded. Add the script tag before supabase.js.');
