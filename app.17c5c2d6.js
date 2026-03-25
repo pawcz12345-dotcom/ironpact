@@ -6844,3 +6844,129 @@ function renderTokenBadge(){const e=AppState.profile.is_beta_user;return`\n    <
     });
   };
 })();
+
+// ═══════════════════════════════════════════════════════════════
+// PATCH v3: Friend Activity Feed
+// ═══════════════════════════════════════════════════════════════
+(function(){
+  var _origRS = renderSocial;
+  var _feedActive = false;
+
+  renderSocial = function renderSocial(container) {
+    _feedActive = false;
+    _origRS(container);
+    _injectFeedTab(container);
+
+    // When user clicks a built-in tab (Friends/Plans/Pacts/Add),
+    // the internal render() wipes innerHTML. Re-inject Feed tab after that.
+    container.addEventListener('click', function(e) {
+      var btn = e.target.closest('[data-tab]');
+      if (btn && !btn.hasAttribute('data-feed-tab')) {
+        _feedActive = false;
+        setTimeout(function() { _injectFeedTab(container); }, 0);
+      }
+    }, true); // capture phase so it fires before internal handlers
+  };
+
+  function _injectFeedTab(container) {
+    var tabNav = container.querySelector('.tab-nav');
+    if (!tabNav || tabNav.querySelector('[data-feed-tab]')) return;
+    var btn = document.createElement('button');
+    btn.className = 'tab-btn' + (_feedActive ? ' active' : '');
+    btn.setAttribute('data-feed-tab', '1');
+    btn.textContent = 'Feed';
+    tabNav.appendChild(btn);
+    btn.addEventListener('click', function() {
+      tabNav.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      _feedActive = true;
+      _showFeedContent(container, tabNav);
+    });
+  }
+
+  function _showFeedContent(container, tabNav) {
+    // Remove all sibling elements after tab-nav (the tab content area)
+    var el = tabNav.nextElementSibling;
+    while (el) {
+      var next = el.nextElementSibling;
+      container.removeChild(el);
+      el = next;
+    }
+    var feedDiv = document.createElement('div');
+    feedDiv.id = 'friend-activity-feed';
+    feedDiv.innerHTML = '<div style="text-align:center;padding:40px 16px;color:var(--text-secondary);">' +
+      '<div style="font-size:32px;margin-bottom:12px;">⏳</div>' +
+      '<div style="font-size:14px;">Loading activity...</div></div>';
+    container.appendChild(feedDiv);
+    _loadFeed(feedDiv);
+  }
+
+  async function _loadFeed(feedDiv) {
+    var friends = (AppState.friends || []).filter(function(f) { return f.status === 'accepted'; });
+    if (!friends.length) {
+      feedDiv.innerHTML = '<div class="empty-state" style="padding:40px 16px;">' +
+        '<div class="empty-state-icon">\uD83C\uDFC3</div>' +
+        '<div class="empty-state-title">No friends yet</div>' +
+        '<div class="empty-state-text">Add friends to see their workouts here.</div></div>';
+      return;
+    }
+
+    var allWorkouts = [];
+    for (var i = 0; i < friends.length; i++) {
+      var f = friends[i];
+      var workouts = await sbLoadFriendWorkouts(f.user_id);
+      for (var j = 0; j < workouts.length; j++) {
+        allWorkouts.push(Object.assign({}, workouts[j], { _friend: f }));
+      }
+    }
+    allWorkouts.sort(function(a, b) { return new Date(b.date) - new Date(a.date); });
+
+    if (!allWorkouts.length) {
+      feedDiv.innerHTML = '<div class="empty-state" style="padding:40px 16px;">' +
+        '<div class="empty-state-icon">\uD83D\uDE34</div>' +
+        '<div class="empty-state-title">No recent activity</div>' +
+        '<div class="empty-state-text">Your friends haven\'t logged any workouts recently.</div></div>';
+      return;
+    }
+
+    var u = (typeof getUnitLabel === 'function') ? getUnitLabel() : 'kg';
+    feedDiv.innerHTML = '<div style="margin-bottom:8px;font-size:12px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.05em;">Recent Activity</div>' +
+      allWorkouts.map(function(w) {
+        var f = w._friend;
+        var ago = _timeAgo(w.date);
+        var vol = w.volume || 0;
+        var volStr = vol >= 1e6 ? (vol/1e6).toFixed(1)+'M' : vol >= 1e3 ? (vol/1e3).toFixed(0)+'K' : vol ? String(Math.round(vol)) : '';
+        var muscles = (w.muscles || []).slice(0, 3).map(function(m) {
+          return '<span class="muscle-tag ' + m + '" style="font-size:10px;padding:2px 6px;">' +
+            (typeof formatMuscleGroupLabel === 'function' ? formatMuscleGroupLabel(m) : m) + '</span>';
+        }).join('');
+        return '<div class="card" style="margin-bottom:10px;padding:14px 16px;">' +
+          '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">' +
+            '<div class="friend-avatar" style="width:36px;height:36px;font-size:14px;flex-shrink:0;">' +
+              (f.display_name || f.username || '?')[0].toUpperCase() +
+            '</div>' +
+            '<div style="flex:1;min-width:0;">' +
+              '<div style="font-weight:700;font-size:13px;">' + (f.display_name || f.username) + '</div>' +
+              '<div style="font-size:11px;color:var(--text-tertiary);">' + ago + '</div>' +
+            '</div>' +
+            '<div style="font-size:11px;color:var(--accent);font-weight:600;">\uD83D\uDCAA Workout</div>' +
+          '</div>' +
+          '<div style="font-size:14px;font-weight:600;margin-bottom:6px;">' + (w.name || 'Workout') + '</div>' +
+          '<div style="display:flex;gap:16px;font-size:12px;color:var(--text-secondary);margin-bottom:' + (muscles ? '8' : '0') + 'px;">' +
+            '<span>\u23F1 ' + (w.duration_minutes || 0) + ' min</span>' +
+            (volStr ? '<span>\u2696 ' + volStr + ' ' + u + '</span>' : '') +
+          '</div>' +
+          (muscles ? '<div style="display:flex;gap:4px;flex-wrap:wrap;">' + muscles + '</div>' : '') +
+        '</div>';
+      }).join('');
+  }
+
+  function _timeAgo(dateStr) {
+    var diff = (Date.now() - new Date(dateStr).getTime()) / 1000;
+    if (diff < 60) return 'just now';
+    if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+    if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+    if (diff < 604800) return Math.floor(diff / 86400) + 'd ago';
+    return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+})();
