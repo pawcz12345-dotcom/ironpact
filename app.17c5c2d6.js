@@ -4884,7 +4884,7 @@ async function sbLoadFriendWorkouts(friendUserId) {
     try {
         const { data, error } = await supabaseClient
             .from("workouts")
-            .select("id, name, started_at, duration_minutes, workout_exercises(exercise:exercises(muscle_group), sets(weight_kg, reps, completed_at))")
+            .select("id, name, started_at, duration_seconds, workout_exercises(exercise:exercises(muscle_group), sets(weight_kg, reps, completed_at))")
             .eq("user_id", friendUserId)
             .order("started_at", { ascending: false })
             .limit(8);
@@ -4893,7 +4893,7 @@ async function sbLoadFriendWorkouts(friendUserId) {
             id: w.id,
             name: w.name || "Workout",
             date: w.started_at,
-            duration_minutes: w.duration_minutes || 0,
+            duration_minutes: Math.round((w.duration_seconds || 0) / 60),
             volume: (w.workout_exercises || []).reduce((acc, ex) =>
                 acc + (ex.sets || []).filter(s => s.completed_at !== null)
                     .reduce((s2, set) => s2 + (set.weight_kg || 0) * (set.reps || 0), 0), 0),
