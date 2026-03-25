@@ -7325,7 +7325,7 @@ function renderTokenBadge(){const e=AppState.profile.is_beta_user;return`\n    <
           var parent = el.closest('[data-exid], .delete-pr-btn')
             || el.parentElement;
           // Find the exercise ID via the delete button sibling
-          var deleteBtn = el.parentElement && el.parentElement.querySelector('.delete-pr-btn');
+          var deleteBtn = el.closest('.exercise-card') && el.closest('.exercise-card').querySelector('.delete-pr-btn');
           if (!deleteBtn) return;
           var exId = deleteBtn.dataset.exid;
           if (!exId) return;
@@ -7343,4 +7343,44 @@ function renderTokenBadge(){const e=AppState.profile.is_beta_user;return`\n    <
       }, 150);
     };
   }
+})();
+
+// ═══════════════════════════════════════════════════════════════
+// PATCH v6: PR delete suppression + no-ties fix
+// ═══════════════════════════════════════════════════════════════
+(function(){
+  var SUPPRESS_KEY = 'ironpact_suppressed_prs';
+
+  function getSuppressed() {
+    try { return JSON.parse(localStorage.getItem(SUPPRESS_KEY) || '[]'); } catch(e) { return []; }
+  }
+  function addSuppressed(exId) {
+    var list = getSuppressed();
+    if (list.indexOf(exId) === -1) list.push(exId);
+    localStorage.setItem(SUPPRESS_KEY, JSON.stringify(list));
+  }
+
+  // Patch buildPRs to strip out suppressed exercises after rebuild
+  var _origBP = buildPRs;
+  buildPRs = function buildPRs() {
+    _origBP.apply(this, arguments);
+    var suppressed = getSuppressed();
+    suppressed.forEach(function(exId) { delete AppState.personalRecords[exId]; });
+  };
+
+  // Patch sbDeletePR to persist suppression locally
+  var _origSDP = sbDeletePR;
+  sbDeletePR = async function sbDeletePR(exerciseId) {
+    addSuppressed(exerciseId);
+    delete AppState.personalRecords[exerciseId];
+    return _origSDP(exerciseId);
+  };
+
+  // Also strip suppressed IDs after sbLoadPersonalRecords
+  var _prevSLPR2 = sbLoadPersonalRecords;
+  sbLoadPersonalRecords = async function sbLoadPersonalRecords() {
+    await _prevSLPR2.apply(this, arguments);
+    var suppressed = getSuppressed();
+    suppressed.forEach(function(exId) { delete AppState.personalRecords[exId]; });
+  };
 })();
