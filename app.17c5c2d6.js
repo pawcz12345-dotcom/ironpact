@@ -630,7 +630,7 @@ function seedExercises() {
         id: "ex-67",
         name: "Diamond Close-Grip Press",
         muscle_group: "arms",
-        equipment: "dumbbell",
+        equipment: "bodyweight",
         exercise_type: "compound",
         description: "Press dumbbells together throughout movement for tricep focus."
     }, {
@@ -875,7 +875,7 @@ function seedExercises() {
         id: "ex-101",
         name: "Ab Wheel Rollout",
         muscle_group: "core",
-        equipment: "other",
+        equipment: "bodyweight",
         exercise_type: "compound",
         description: "Kneel, roll wheel forward extending body, roll back."
     }, {
@@ -1060,7 +1060,7 @@ function seedExercises() {
         id: "ex-123",
         name: "Box Jumps",
         muscle_group: "cardio",
-        equipment: "other",
+        equipment: "bodyweight",
         exercise_type: "cardio",
         description: "Jump onto elevated box from standing, step down, repeat."
     }, {
@@ -7153,5 +7153,57 @@ function renderTokenBadge(){const e=AppState.profile.is_beta_user;return`\n    <
       }
     }
     return _prevHandleRoute.apply(this, arguments);
+  };
+})();
+
+// ═══════════════════════════════════════════════════════════════
+// PATCH v4c: Fix bodyweight equipment tags (production + demo)
+// Applied by name so it works on Supabase UUIDs too
+// ═══════════════════════════════════════════════════════════════
+(function(){
+  var BW_EXERCISE_NAMES = [
+    // Chest
+    "Archer Push-ups","Chest Dips","Diamond Push-ups","Push-ups",
+    "Close-Grip Push-ups","Diamond Close-Grip Press",
+    // Back
+    "Chin-ups","Inverted Row","Pull-ups","Dead Hang",
+    // Shoulders
+    "Handstand Push-ups","Pike Push-ups",
+    // Arms
+    "Tricep Dips",
+    // Legs
+    "Nordic Hamstring Curl","Sissy Squat","Side Lunge","Wall Sit","Box Jumps",
+    // Core
+    "Bicycle Crunch","Bird Dog","Dead Bug","Decline Sit-ups","Dragon Flag",
+    "Flutter Kicks","Hanging Leg Raise","L-Sit Hold","Mountain Climbers",
+    "Plank","Russian Twist","Side Plank (Left)","Side Plank (Right)",
+    "Toe Touches","V-ups","Ab Wheel Rollout",
+    // Cardio
+    "Burpees"
+  ];
+
+  function applyBWTags() {
+    (AppState.exercises || []).forEach(function(ex) {
+      if (BW_EXERCISE_NAMES.indexOf(ex.name) !== -1) {
+        ex.equipment = 'bodyweight';
+      }
+    });
+  }
+
+  // Apply whenever exercises are loaded
+  var _origSLE = sbLoadExercises;
+  sbLoadExercises = async function sbLoadExercises() {
+    await _origSLE.apply(this, arguments);
+    applyBWTags();
+  };
+
+  // Also apply immediately if exercises are already loaded
+  if (AppState.exercises && AppState.exercises.length > 0) applyBWTags();
+
+  // Re-apply after full user data loads (belt-and-suspenders)
+  var _origLUD = loadUserData;
+  loadUserData = async function loadUserData() {
+    await _origLUD.apply(this, arguments);
+    applyBWTags();
   };
 })();
