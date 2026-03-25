@@ -183,7 +183,7 @@ const DB = {
   // --- Settings ---
   getSettings() {
     const stored = localStorage.getItem(this.KEYS.SETTINGS);
-    const defaults = { unit: 'kg', userName1: 'Player 1', userName2: 'Player 2' };
+    const defaults = { unit: 'kg', userName1: 'Player 1', userName2: 'Player 2', bodyweight: null };
     return stored ? { ...defaults, ...JSON.parse(stored) } : defaults;
   },
 

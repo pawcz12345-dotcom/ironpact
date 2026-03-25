@@ -42,6 +42,21 @@ const Settings = {
                onchange="Settings.updateUsername(this.value)">
       </div>
 
+      <div class="settings-row">
+        <div class="settings-row-left">
+          <div class="settings-row-label">Your Bodyweight</div>
+          <div class="settings-row-sub">Auto-fills for bodyweight exercises</div>
+        </div>
+        <div style="display:flex; align-items:center; gap:4px;">
+          <input class="settings-input" type="number" inputmode="decimal"
+                 value="${settings.bodyweight || ''}"
+                 placeholder="e.g. 80"
+                 style="background: var(--bg-3); border: 1px solid var(--border); color: var(--text); border-radius: var(--radius-sm); padding: 8px 12px; font-size: 15px; font-family: inherit; text-align: right; max-width: 120px;"
+                 onchange="Settings.updateBodyweight(this.value)">
+          <span style="color:var(--text-3); font-size:13px;">${settings.unit}</span>
+        </div>
+      </div>
+
       <!-- Units -->
       <div class="settings-section-title">Preferences</div>
 
@@ -389,6 +404,13 @@ const Settings = {
       await Cloud.updateProfile(userId, { display_name: name });
     }
     App.toast('Name saved!', 'success');
+  },
+
+  async updateBodyweight(value) {
+    const settings = DB.getSettings();
+    settings.bodyweight = value ? parseFloat(value) : null;
+    DB.saveSettings(settings);
+    App.toast('Bodyweight saved!', 'success');
   },
 
   async updateUsername(value) {
