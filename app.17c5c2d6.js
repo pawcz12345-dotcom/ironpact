@@ -7181,3 +7181,166 @@ function renderTokenBadge(){const e=AppState.profile.is_beta_user;return`\n    <
     applyBWTags();
   };
 })();
+
+// ═══════════════════════════════════════════════════════════════
+// PATCH v5: e1RM-based PR logic (Epley formula)
+// ═══════════════════════════════════════════════════════════════
+(function(){
+  // Epley formula: weight × (1 + reps/30). For 1 rep returns weight directly.
+  window.calcE1RM = function calcE1RM(weight, reps) {
+    if (!weight || weight <= 0) return 0;
+    if (!reps || reps <= 1) return weight;
+    return Math.round(weight * (1 + reps / 30) * 10) / 10;
+  };
+
+  // 1. Patch sbCheckAndUpsertPR to compare on e1RM
+  var _origCPR = sbCheckAndUpsertPR;
+  sbCheckAndUpsertPR = async function sbCheckAndUpsertPR(exerciseId, set) {
+    if (isDemoMode || !supabaseClient || !AppState.user) return false;
+    try {
+      var userId = AppState.user.id;
+      var weight = getEffectiveWeight(exerciseId, set.weight_kg || 0);
+      var reps = set.reps || 0;
+      var e1rm = calcE1RM(weight, reps);
+      var volume = weight * reps;
+      var isPR = false;
+
+      if (e1rm > 0) {
+        var res = await supabaseClient.from('personal_records')
+          .select('id, value')
+          .eq('user_id', userId)
+          .eq('exercise_id', exerciseId)
+          .eq('record_type', 'e1rm')
+          .maybeSingle();
+        var existing = res.data;
+        if (!existing || e1rm > (existing.value || 0)) {
+          await supabaseClient.from('personal_records').upsert({
+            user_id: userId,
+            exercise_id: exerciseId,
+            record_type: 'e1rm',
+            value: e1rm,
+            set_id: set.id,
+            achieved_at: set.completed_at || new Date().toISOString()
+          }, { onConflict: 'user_id,exercise_id,record_type' });
+          // Also update max_weight record so existing queries still work
+          await supabaseClient.from('personal_records').upsert({
+            user_id: userId,
+            exercise_id: exerciseId,
+            record_type: 'max_weight',
+            value: weight,
+            set_id: set.id,
+            achieved_at: set.completed_at || new Date().toISOString()
+          }, { onConflict: 'user_id,exercise_id,record_type' });
+          isPR = true;
+        }
+      }
+      if (volume > 0) {
+        var vRes = await supabaseClient.from('personal_records')
+          .select('id, value')
+          .eq('user_id', userId)
+          .eq('exercise_id', exerciseId)
+          .eq('record_type', 'max_volume')
+          .maybeSingle();
+        if (!vRes.data || volume > (vRes.data.value || 0)) {
+          await supabaseClient.from('personal_records').upsert({
+            user_id: userId,
+            exercise_id: exerciseId,
+            record_type: 'max_volume',
+            value: volume,
+            set_id: set.id,
+            achieved_at: set.completed_at || new Date().toISOString()
+          }, { onConflict: 'user_id,exercise_id,record_type' });
+        }
+      }
+      if (isPR && set.id) {
+        await supabaseClient.from('sets').update({ is_pr: true }).eq('id', set.id);
+      }
+      return isPR;
+    } catch(e) {
+      console.error('PR check failed:', e);
+      return false;
+    }
+  };
+
+  // 2. Patch in-workout toggleSetComplete to use e1RM for live PR detection
+  var _tickDelay;
+  var _origTSC;
+  function patchToggleSetComplete() {
+    if (!window.toggleSetComplete || window.toggleSetComplete._e1rmPatched) return;
+    _origTSC = window.toggleSetComplete;
+    window.toggleSetComplete = function(exIdx, setIdx) {
+      _origTSC(exIdx, setIdx);
+      // After the original runs, check if this was a PR using e1RM
+      if (!AppState.activeWorkout) return;
+      var ex = AppState.activeWorkout.exercises[exIdx];
+      if (!ex) return;
+      var set = ex.sets[setIdx];
+      if (!set || !set.completed) return;
+      var weight = getEffectiveWeight(ex.exercise_id, set.weight_kg || 0);
+      var reps = set.reps || 0;
+      var e1rm = calcE1RM(weight, reps);
+      if (e1rm <= 0) return;
+      var pr = AppState.personalRecords[ex.exercise_id];
+      var prE1rm = pr ? (pr.e1rm || calcE1RM(pr.max_weight || 0, pr.max_weight_reps || 1)) : 0;
+      if (e1rm > prE1rm) {
+        // Update in-memory PR with e1RM
+        if (!pr) {
+          AppState.personalRecords[ex.exercise_id] = { max_weight: weight, max_weight_reps: reps, max_reps: reps, max_volume_set: weight * reps, e1rm: e1rm };
+        } else {
+          pr.e1rm = e1rm;
+        }
+      }
+    };
+    window.toggleSetComplete._e1rmPatched = true;
+  }
+
+  // Re-patch after each renderNewWorkout (since toggleSetComplete is reassigned)
+  var _prevRNW2 = renderNewWorkout;
+  renderNewWorkout = function renderNewWorkout(container) {
+    _prevRNW2(container);
+    setTimeout(patchToggleSetComplete, 0);
+  };
+
+  // 3. Add e1RM field to loaded PRs and update stats display
+  var _prevSLPR = sbLoadPersonalRecords;
+  sbLoadPersonalRecords = async function sbLoadPersonalRecords() {
+    await _prevSLPR.apply(this, arguments);
+    // Compute e1rm for each PR from max_weight + max_weight_reps
+    Object.keys(AppState.personalRecords).forEach(function(exId) {
+      var pr = AppState.personalRecords[exId];
+      if (pr && !pr.e1rm) {
+        pr.e1rm = calcE1RM(pr.max_weight || 0, pr.max_weight_reps || 1);
+      }
+    });
+  };
+
+  // 4. Patch stats PR display to show Est. 1RM
+  var _prevRS = renderStats;
+  if (typeof renderStats === 'function') {
+    renderStats = function renderStats(container) {
+      _prevRS(container);
+      // Replace PR weight display with e1RM
+      setTimeout(function() {
+        container.querySelectorAll('.exercise-card-detail').forEach(function(el) {
+          var parent = el.closest('[data-exid], .delete-pr-btn')
+            || el.parentElement;
+          // Find the exercise ID via the delete button sibling
+          var deleteBtn = el.parentElement && el.parentElement.querySelector('.delete-pr-btn');
+          if (!deleteBtn) return;
+          var exId = deleteBtn.dataset.exid;
+          if (!exId) return;
+          var pr = AppState.personalRecords[exId];
+          if (!pr) return;
+          var e1rm = pr.e1rm || calcE1RM(pr.max_weight || 0, pr.max_weight_reps || 1);
+          var u = getUnitLabel();
+          var actualStr = formatWeight(pr.max_weight);
+          var e1rmStr = formatWeight(e1rm);
+          el.innerHTML =
+            '<span class="text-accent" style="font-weight:700;">Est. 1RM: ' + e1rmStr + ' ' + u + '</span>' +
+            '<span style="color:var(--text-tertiary);margin:0 4px;">·</span>' +
+            '<span style="color:var(--text-tertiary);">' + actualStr + ' × ' + (pr.max_weight_reps || '—') + '</span>';
+        });
+      }, 150);
+    };
+  }
+})();
