@@ -7075,3 +7075,83 @@ function renderTokenBadge(){const e=AppState.profile.is_beta_user;return`\n    <
     };
   }
 })();
+
+// ═══════════════════════════════════════════════════════════════
+// PATCH v4b: Fix BW weights on workout copy/load
+// ═══════════════════════════════════════════════════════════════
+(function(){
+  // Helper: for any bodyweight exercise in the list with weight_kg===0, fill with user's BW
+  function fixBWWeights(exercises) {
+    if (!exercises) return false;
+    var bwKg = getBodyweightKg();
+    var hasBW = !!(AppState.profile.body_weight || AppState.profile.weight_kg);
+    var changed = false;
+    exercises.forEach(function(ex) {
+      var exObj = (AppState.exercises || []).find(function(e) { return e.id === ex.exercise_id; });
+      if (!exObj || (exObj.equipment || '').toLowerCase() !== 'bodyweight') return;
+      (ex.sets || []).forEach(function(s) {
+        if (!s.weight_kg || s.weight_kg === 0) {
+          s.weight_kg = bwKg;
+          s._displayWeight = Math.round(10 * kgToDisplay(bwKg)) / 10;
+          changed = true;
+        }
+      });
+    });
+    return changed;
+  }
+
+  // Patch renderNewWorkout to fix BW weights before rendering
+  // (covers copy-workout → #/workout/new flow)
+  var _prevRNW = renderNewWorkout;
+  renderNewWorkout = function renderNewWorkout(container) {
+    // If there's already an active workout (copied/loaded), fix BW before render
+    if (AppState.activeWorkout && AppState.activeWorkout.exercises) {
+      fixBWWeights(AppState.activeWorkout.exercises);
+    }
+    _prevRNW(container);
+  };
+
+  // Patch showEditWorkoutModal to fix BW weights in edit sets
+  var _prevEWM = showEditWorkoutModal;
+  if (typeof showEditWorkoutModal === 'function') {
+    showEditWorkoutModal = function showEditWorkoutModal(workout, workoutId, container) {
+      // Fix BW weights on the cloned exercises before the modal renders
+      if (workout && workout.exercises) {
+        var cloned = JSON.parse(JSON.stringify(workout));
+        fixBWWeights(cloned.exercises);
+        return _prevEWM(cloned, workoutId, container);
+      }
+      return _prevEWM(workout, workoutId, container);
+    };
+  }
+
+  // Also prompt for BW if not set when copying a workout containing BW exercises
+  var _prevHandleRoute = handleRoute;
+  handleRoute = function handleRoute() {
+    var hash = (window.location.hash || '#/').slice(1) || '/';
+    if (hash === '/workout/new' && AppState.activeWorkout) {
+      var hasBWExercise = (AppState.activeWorkout.exercises || []).some(function(ex) {
+        var exObj = (AppState.exercises || []).find(function(e) { return e.id === ex.exercise_id; });
+        return exObj && (exObj.equipment || '').toLowerCase() === 'bodyweight';
+      });
+      var hasBWSet = (AppState.activeWorkout.exercises || []).some(function(ex) {
+        return (ex.sets || []).some(function(s) { return !s.weight_kg || s.weight_kg === 0; });
+      });
+      if (hasBWExercise && hasBWSet && !AppState.profile.body_weight && !AppState.profile.weight_kg) {
+        var isImperial = AppState.unitPref === 'imperial' || AppState.profile.unit_pref === 'imperial';
+        var u = isImperial ? 'lbs' : 'kg';
+        var val = window.prompt('This workout has bodyweight exercises. Enter your body weight (' + u + '):', '');
+        if (val) {
+          var bw = parseFloat(val);
+          if (!isNaN(bw) && bw > 0) {
+            AppState.profile.body_weight = bw;
+            if (!isDemoMode && supabaseClient && AppState.user) {
+              sbUpdateProfile({ body_weight: bw, updated_at: new Date().toISOString() });
+            }
+          }
+        }
+      }
+    }
+    return _prevHandleRoute.apply(this, arguments);
+  };
+})();
