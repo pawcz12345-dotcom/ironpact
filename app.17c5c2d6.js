@@ -7053,26 +7053,7 @@ function renderTokenBadge(){const e=AppState.profile.is_beta_user;return`\n    <
             }
           }
 
-          // After the original handler adds the exercise + calls render(), fix weight if 0
-          setTimeout(function() {
-            if (!AppState.activeWorkout) return;
-            var exes = AppState.activeWorkout.exercises;
-            var last = exes[exes.length - 1];
-            if (!last || last.exercise_id !== eid) return;
-            var bwKg = getBodyweightKg();
-            var changed = false;
-            (last.sets || []).forEach(function(s) {
-              if (!s.weight_kg || s.weight_kg === 0) {
-                s.weight_kg = bwKg;
-                s._displayWeight = Math.round(10 * kgToDisplay(bwKg)) / 10;
-                changed = true;
-              }
-            });
-            if (changed) {
-              var vc = document.getElementById('view-container');
-              if (vc) renderNewWorkout(vc);
-            }
-          }, 0);
+
         }, true);
       }, 50);
     };
@@ -7080,55 +7061,10 @@ function renderTokenBadge(){const e=AppState.profile.is_beta_user;return`\n    <
 })();
 
 // ═══════════════════════════════════════════════════════════════
-// PATCH v4b: Fix BW weights on workout copy/load
+// PATCH v4b: Prompt for BW on copy if not set
 // ═══════════════════════════════════════════════════════════════
 (function(){
-  // Helper: for any bodyweight exercise in the list with weight_kg===0, fill with user's BW
-  function fixBWWeights(exercises) {
-    if (!exercises) return false;
-    var bwKg = getBodyweightKg();
-    var hasBW = !!(AppState.profile.body_weight || AppState.profile.weight_kg);
-    var changed = false;
-    exercises.forEach(function(ex) {
-      var exObj = (AppState.exercises || []).find(function(e) { return e.id === ex.exercise_id; });
-      if (!exObj || (exObj.equipment || '').toLowerCase() !== 'bodyweight') return;
-      (ex.sets || []).forEach(function(s) {
-        if (!s.weight_kg || s.weight_kg === 0) {
-          s.weight_kg = bwKg;
-          s._displayWeight = Math.round(10 * kgToDisplay(bwKg)) / 10;
-          changed = true;
-        }
-      });
-    });
-    return changed;
-  }
-
-  // Patch renderNewWorkout to fix BW weights before rendering
-  // (covers copy-workout → #/workout/new flow)
-  var _prevRNW = renderNewWorkout;
-  renderNewWorkout = function renderNewWorkout(container) {
-    // If there's already an active workout (copied/loaded), fix BW before render
-    if (AppState.activeWorkout && AppState.activeWorkout.exercises) {
-      fixBWWeights(AppState.activeWorkout.exercises);
-    }
-    _prevRNW(container);
-  };
-
-  // Patch showEditWorkoutModal to fix BW weights in edit sets
-  var _prevEWM = showEditWorkoutModal;
-  if (typeof showEditWorkoutModal === 'function') {
-    showEditWorkoutModal = function showEditWorkoutModal(workout, workoutId, container) {
-      // Fix BW weights on the cloned exercises before the modal renders
-      if (workout && workout.exercises) {
-        var cloned = JSON.parse(JSON.stringify(workout));
-        fixBWWeights(cloned.exercises);
-        return _prevEWM(cloned, workoutId, container);
-      }
-      return _prevEWM(workout, workoutId, container);
-    };
-  }
-
-  // Also prompt for BW if not set when copying a workout containing BW exercises
+  // Prompt for BW if not set when copying a workout containing BW exercises
   var _prevHandleRoute = handleRoute;
   handleRoute = function handleRoute() {
     var hash = (window.location.hash || '#/').slice(1) || '/';
