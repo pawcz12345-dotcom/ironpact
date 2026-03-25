@@ -4884,7 +4884,7 @@ async function sbLoadFriendWorkouts(friendUserId) {
     try {
         const { data, error } = await supabaseClient
             .from("workouts")
-            .select("id, name, started_at, duration_minutes, workout_exercises(exercise:exercises(muscle_group), sets(weight_kg, reps, completed))")
+            .select("id, name, started_at, duration_minutes, workout_exercises(exercise:exercises(muscle_group), sets(weight_kg, reps, completed_at))")
             .eq("user_id", friendUserId)
             .order("started_at", { ascending: false })
             .limit(8);
@@ -4895,7 +4895,7 @@ async function sbLoadFriendWorkouts(friendUserId) {
             date: w.started_at,
             duration_minutes: w.duration_minutes || 0,
             volume: (w.workout_exercises || []).reduce((acc, ex) =>
-                acc + (ex.sets || []).filter(s => s.completed !== false)
+                acc + (ex.sets || []).filter(s => s.completed_at !== null)
                     .reduce((s2, set) => s2 + (set.weight_kg || 0) * (set.reps || 0), 0), 0),
             muscles: [...new Set((w.workout_exercises || [])
                 .map(ex => ex.exercise?.muscle_group).filter(Boolean))]
@@ -6711,7 +6711,7 @@ function renderCoach(container) {
             date: w.date,
             exercises: (w.exercises || []).map(ex => ({
                 name: ex.name,
-                sets: (ex.sets || []).filter(s => s.completed !== false).map(s => ({
+                sets: (ex.sets || []).filter(s => s.completed_at !== null).map(s => ({
                     weight: s.weight_kg, reps: s.reps
                 }))
             }))
