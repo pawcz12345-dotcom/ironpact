@@ -6773,4 +6773,74 @@ function renderCoach(container) {
 }
 function renderTokenBadge(){const e=AppState.profile.is_beta_user;return`\n    <div class="sidebar-token-display">\n      <span class="token-icon-sm">⬡</span>\n      <span class="token-balance-display">${AppState.tokenBalance||0}</span>\n      <span style="font-size:11px;color:var(--text-tertiary);">tokens</span>\n      ${e?'<span class="badge-beta" style="font-size:9px;padding:2px 6px;margin-left:2px;">BETA</span>':""}\n    </div>\n  `}function getTokenCostDisplay(e){return AppState.profile.is_beta_user?`<span style="color:var(--success);font-weight:700;">FREE</span> <span style="text-decoration:line-through;color:var(--text-tertiary);font-size:11px;">${e} ⬡</span>`:`<span>${e} ⬡</span>`}AppState.tokenBalance=0,AppState.missions=[],AppState.userMissions=[],AppState.cosmetics=[],AppState.userCosmetics=[],AppState.subscription=null,Object.assign(AppState.profile,{token_balance:0,is_beta_user:!1,is_premium:!1,subscription_plan:"free",equipped_title:null,equipped_badge:null,equipped_theme:null,equipped_frame:null,daily_workout_count:0,last_workout_credited_at:null,weekly_tokens_earned:0,week_reset_at:null});const _originalHandleRoute=handleRoute;handleRoute=function handleRoute(){const e=(window.location.hash||"#/").slice(1)||"/";if("/missions"===e){if(!AppState.isAuthenticated)return void(window.location.hash="#/");const e=document.getElementById("sidebar"),t=document.getElementById("bottom-nav"),a=document.getElementById("demo-badge");e&&(e.classList.remove("hidden"),e.style.display=""),t&&(t.classList.remove("hidden"),t.style.display=""),a&&(isDemoMode?a.classList.remove("hidden"):a.classList.add("hidden")),updateActiveNav("/missions");const s=document.getElementById("view-container");return s.innerHTML="",s.className="view-enter",Object.keys(AppState.chartInstances).forEach(e=>{AppState.chartInstances[e]&&(AppState.chartInstances[e].destroy(),delete AppState.chartInstances[e])}),void renderMissions(s)}if("/shop"===e){if(!AppState.isAuthenticated)return void(window.location.hash="#/");const e=document.getElementById("sidebar"),t=document.getElementById("bottom-nav"),a=document.getElementById("demo-badge");e&&(e.classList.remove("hidden"),e.style.display=""),t&&(t.classList.remove("hidden"),t.style.display=""),a&&(isDemoMode?a.classList.remove("hidden"):a.classList.add("hidden")),updateActiveNav("/shop");const s=document.getElementById("view-container");return s.innerHTML="",s.className="view-enter",Object.keys(AppState.chartInstances).forEach(e=>{AppState.chartInstances[e]&&(AppState.chartInstances[e].destroy(),delete AppState.chartInstances[e])}),void renderShop(s)}if("/subscription"===e){if(!AppState.isAuthenticated)return void(window.location.hash="#/");const e=document.getElementById("sidebar"),t=document.getElementById("bottom-nav"),a=document.getElementById("demo-badge");e&&(e.classList.remove("hidden"),e.style.display=""),t&&(t.classList.remove("hidden"),t.style.display=""),a&&(isDemoMode?a.classList.remove("hidden"):a.classList.add("hidden")),updateActiveNav("/subscription");const s=document.getElementById("view-container");return s.innerHTML="",s.className="view-enter",Object.keys(AppState.chartInstances).forEach(e=>{AppState.chartInstances[e]&&(AppState.chartInstances[e].destroy(),delete AppState.chartInstances[e])}),void renderSubscription(s)}if("/coach"===e){if(!AppState.isAuthenticated)return void(window.location.hash="#/");const e=document.getElementById("sidebar"),t=document.getElementById("bottom-nav"),a=document.getElementById("demo-badge");e&&(e.classList.remove("hidden"),e.style.display=""),t&&(t.classList.remove("hidden"),t.style.display=""),a&&(isDemoMode?a.classList.remove("hidden"):a.classList.add("hidden")),updateActiveNav("/coach");const s=document.getElementById("view-container");return s.innerHTML="",s.className="view-enter",Object.keys(AppState.chartInstances).forEach(e=>{AppState.chartInstances[e]&&(AppState.chartInstances[e].destroy(),delete AppState.chartInstances[e])}),void renderCoach(s)}if("/support"===e){if(!AppState.isAuthenticated)return void(window.location.hash="#/");const e=document.getElementById("sidebar"),t=document.getElementById("bottom-nav"),a=document.getElementById("demo-badge");e&&(e.classList.remove("hidden"),e.style.display=""),t&&(t.classList.remove("hidden"),t.style.display=""),a&&(isDemoMode?a.classList.remove("hidden"):a.classList.add("hidden")),updateActiveNav("/support");const s=document.getElementById("view-container");return s.innerHTML="",s.className="view-enter",Object.keys(AppState.chartInstances).forEach(e=>{AppState.chartInstances[e]&&(AppState.chartInstances[e].destroy(),delete AppState.chartInstances[e])}),void renderSupport(s)}_originalHandleRoute()};const _originalUpdateActiveNav=updateActiveNav;updateActiveNav=function updateActiveNav(e){_originalUpdateActiveNav(e),"/missions"===e?document.querySelectorAll('[data-nav="missions"]').forEach(e=>e.classList.add("active")):"/shop"===e?document.querySelectorAll('[data-nav="shop"]').forEach(e=>e.classList.add("active")):"/subscription"===e?document.querySelectorAll('[data-nav="subscription"]').forEach(e=>e.classList.add("active")):"/support"===e?document.querySelectorAll('[data-nav="support"]').forEach(e=>e.classList.add("active")):"/coach"===e&&document.querySelectorAll('[data-nav="coach"]').forEach(e=>e.classList.add("active"))};const _originalHandleAuthSignOut=handleAuthSignOut;handleAuthSignOut=async function handleAuthSignOut(){await _originalHandleAuthSignOut(),AppState.tokenBalance=0,AppState.missions=[],AppState.userMissions=[],AppState.cosmetics=[],AppState.userCosmetics=[],AppState.subscription=null,AppState.sharedPlans=[],Object.assign(AppState.profile,{token_balance:0,is_beta_user:!1,is_premium:!1,subscription_plan:"free",equipped_title:null,equipped_badge:null,equipped_theme:null,equipped_frame:null,daily_workout_count:0,last_workout_credited_at:null,weekly_tokens_earned:0,week_reset_at:null}),applyTheme(null)};const _originalLoadUserData=loadUserData;loadUserData=async function loadUserData(){await _originalLoadUserData(),await Promise.all([sbLoadTokenBalance(),sbLoadMissions(),sbLoadCosmetics()]),await Promise.all([sbLoadUserMissions(),sbLoadUserCosmetics(),sbLoadSubscription()]),await Promise.all([sbLoadPlans(),sbLoadSharedPlans()])};const _originalRenderNewWorkout=renderNewWorkout;renderNewWorkout=function renderNewWorkout(e){_originalRenderNewWorkout(e);const t=window.finishWorkout;window.finishWorkout=async function(){const e=AppState.workouts.length;AppState.tokenBalance,window.showToast;await t();if(AppState.workouts.length>e||null===AppState.activeWorkout){const e=AppState.workouts[0];if(e){const t=e.duration_minutes?60*e.duration_minutes:0,a={exercises:e.exercises||[],duration_seconds:t,id:e.id};await checkFraudAndEarnTokens(a,e.id)}}}};const _originalInitApp=initApp;initApp=async function initApp(){function restoreThemeWhenReady(e){if(AppState.profile.equipped_theme){const e=(AppState.cosmetics.length>0?AppState.cosmetics:seedCosmetics()).find(e=>e.id===AppState.profile.equipped_theme);e&&applyTheme(e)}else e<20&&setTimeout(()=>restoreThemeWhenReady(e+1),200)}await _originalInitApp(),isDemoMode&&(AppState.missions=seedMissions(),AppState.cosmetics=seedCosmetics(),AppState.tokenBalance=75,AppState.profile.token_balance=75,AppState.profile.is_beta_user=!1,AppState.userMissions=computeUserMissions(),AppState.userCosmetics=seedCosmetics().filter(e=>0===e.cost).map(e=>({id:"uc-"+e.id,cosmetic_id:e.id,user_id:"demo",purchased_at:(new Date).toISOString()})),AppState.subscription={plan:"free",status:"active"}),setTimeout(updateTokenDisplay,100),setTimeout(()=>restoreThemeWhenReady(0),150)};const _origDOMContentLoaded=document.addEventListener.bind(document);window.removeEventListener("hashchange",handleRoute);window.addEventListener("hashchange",function _routeWithSave(){if(AppState.activeWorkout)saveActiveWorkoutToStorage();handleRoute();});document.addEventListener("DOMContentLoaded",()=>{injectSocialNav(),initApp()});
 
-App.js
+// ═══════════════════════════════════════════════════════════════
+// PATCH v2: Workout Tab Switching Fix + Edit Duration
+// ═══════════════════════════════════════════════════════════════
+
+// 1. Redirect /workouts → /workout/new when an active workout is in progress
+// This prevents the history page from replacing an active workout view
+(function(){
+  var _h = handleRoute;
+  handleRoute = function handleRoute() {
+    var hash = (window.location.hash || '#/').slice(1) || '/';
+    if (AppState.activeWorkout && hash === '/workouts') {
+      window.location.hash = '#/workout/new';
+      return;
+    }
+    return _h.apply(this, arguments);
+  };
+})();
+
+// 2. Add editable duration to old workout detail pages
+(function(){
+  var _orig = renderWorkoutDetail;
+  renderWorkoutDetail = function renderWorkoutDetail(container, workoutId) {
+    _orig(container, workoutId);
+    var workout = AppState.workouts.find(function(w) { return w.id === workoutId; });
+    if (!workout) return;
+    // Find the Duration stat card
+    var cards = container.querySelectorAll('.stat-card');
+    var durationCard = null;
+    cards.forEach(function(c) {
+      var lbl = c.querySelector('.stat-label');
+      if (lbl && lbl.textContent.trim() === 'Duration') durationCard = c;
+    });
+    if (!durationCard) return;
+    var valEl = durationCard.querySelector('.stat-value');
+    if (!valEl) return;
+    // Add pencil icon and make clickable
+    valEl.style.cursor = 'pointer';
+    valEl.title = 'Click to edit duration';
+    var pencil = document.createElement('svg');
+    pencil.setAttribute('viewBox','0 0 24 24');
+    pencil.setAttribute('fill','none');
+    pencil.setAttribute('stroke','currentColor');
+    pencil.setAttribute('stroke-width','2');
+    pencil.style.cssText = 'width:12px;height:12px;opacity:0.4;vertical-align:middle;margin-left:4px;';
+    pencil.innerHTML = '<path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>';
+    valEl.appendChild(pencil);
+    valEl.addEventListener('click', function() {
+      var cur = workout.duration_minutes || 0;
+      var newVal = window.prompt('Edit duration (minutes):', String(cur));
+      if (newVal === null) return;
+      var mins = parseInt(newVal, 10);
+      if (isNaN(mins) || mins < 0) { showToast('Invalid duration', 'error'); return; }
+      workout.duration_minutes = mins;
+      var durationSecs = mins * 60;
+      // Persist to Supabase
+      if (!isDemoMode && supabaseClient && AppState.user) {
+        supabaseClient.from('workouts')
+          .update({ duration_seconds: durationSecs })
+          .eq('id', workoutId)
+          .then(function(res) {
+            if (res && res.error) showToast('Save failed', 'error');
+            else showToast('Duration updated \u2713');
+          });
+      } else {
+        showToast('Duration updated \u2713');
+      }
+      // Re-render to reflect updated value
+      renderWorkoutDetail(container, workoutId);
+    });
+  };
+})();
