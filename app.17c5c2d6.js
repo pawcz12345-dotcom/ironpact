@@ -2831,8 +2831,10 @@ async function sbCheckAndUpsertPR(e, t) {
         let i = !1;
         if (s > 0) {
             const {
-                data: n
+                data: n,
+                error: e1
             } = await supabaseClient.from("personal_records").select("id, value").eq("user_id", a).eq("exercise_id", e).eq("record_type", "max_weight").maybeSingle();
+            if (e1) throw e1;
             (!n || s > (n.value || 0)) && (await supabaseClient.from("personal_records").upsert({
                 user_id: a,
                 exercise_id: e,
@@ -2846,8 +2848,10 @@ async function sbCheckAndUpsertPR(e, t) {
         }
         if (n > 0) {
             const {
-                data: s
+                data: s,
+                error: e2
             } = await supabaseClient.from("personal_records").select("id, value").eq("user_id", a).eq("exercise_id", e).eq("record_type", "max_volume").maybeSingle();
+            if (e2) throw e2;
             (!s || n > (s.value || 0)) && (await supabaseClient.from("personal_records").upsert({
                 user_id: a,
                 exercise_id: e,
