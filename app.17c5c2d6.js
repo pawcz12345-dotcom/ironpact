@@ -3265,7 +3265,7 @@ async function loadUserData() {
     if (!isDemoMode) {
         AppState._loading = !0;
         try {
-            await Promise.all([sbLoadExercises(), sbLoadProfile(), sbLoadWorkouts()]), await sbLoadPersonalRecords(), 0 === Object.keys(AppState.personalRecords).length && AppState.workouts.length > 0 && buildPRs(), await Promise.all([sbLoadCoachingLogs(), sbLoadBodyMeasurements(), sbLoadFriends(), sbLoadPacts()]);
+            await Promise.all([sbLoadExercises(), sbLoadProfile(), sbLoadWorkouts()]), await sbLoadPersonalRecords(), await Promise.all([sbLoadCoachingLogs(), sbLoadBodyMeasurements(), sbLoadFriends(), sbLoadPacts()]);
             updateLoginStreak()
         } catch (e) {
             console.error("Error loading user data:", e)
