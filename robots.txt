@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://ironpact-xi.vercel.app/sitemap.xml
