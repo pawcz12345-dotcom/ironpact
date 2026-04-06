@@ -6627,7 +6627,7 @@ function renderShop(e) {
                 e.remove(), render()
             })
         })
-        e.querySelectorAll(".token-bundle-btn").forEach(btn=>{btn.addEventListener("click",async()=>{if(isDemoMode)return void showToast("Token purchases unavailable in demo mode","info");const bundleId=btn.dataset.bundle,origText=btn.dataset.price||"Buy";btn.disabled=true;btn.textContent="Loading...";try{const res=await supabaseClient.functions.invoke("stripe-checkout",{body:{bundle_id:bundleId,return_url:window.location.origin}});if(res.error)throw new Error(res.error.message||"Checkout failed");if(res.data?.url){window.location.href=res.data.url;}else{throw new Error("No checkout URL returned");}}catch(err){console.error("Bundle checkout error:",err);showToast("Checkout failed: "+err.message,"error",4000);btn.disabled=false;btn.textContent=origText;}})})
+        e.querySelectorAll(".token-bundle-btn").forEach(btn=>{btn.addEventListener("click",async()=>{if(isDemoMode)return void showToast("Token purchases unavailable in demo mode","info");const bundleId=btn.dataset.bundle,origText=btn.dataset.price||"Buy";btn.disabled=true;btn.textContent="Loading...";try{const res=await supabaseClient.functions.invoke("stripe-checkout",{body:{bundle_id:bundleId,return_url:window.location.origin}});if(res.error){let msg=res.error.message||"Checkout failed";try{const b=await res.error.context?.json?.();if(b?.error)msg=b.error;}catch(ex){}throw new Error(msg);}if(res.data?.url){window.location.href=res.data.url;}else{throw new Error("No checkout URL returned");}}catch(err){console.error("Bundle checkout error:",err);showToast(err.message,"error",5000);btn.disabled=false;btn.textContent=origText;}})})
     }()
 }
 function renderSubscription(e) {
