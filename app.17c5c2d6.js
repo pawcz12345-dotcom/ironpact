@@ -89,7 +89,12 @@ const LBS_TO_KG = 1 / 2.20462,
         friends: [],
         pacts: [],
         coachingLogs: [],
-        bodyMeasurements: []
+        bodyMeasurements: [],
+        missions: [],
+        userMissions: [],
+        tokenBalance: 0,
+        cosmetics: [],
+        subscription: null
     };
 function getUnitLabel() {
     return "imperial" === AppState.unitPref ? "lbs" : "kg"
@@ -5736,6 +5741,84 @@ function seedMissions() {
         token_reward: 50,
         icon: "🎖️",
         chain_name: "Founding Member"
+    }, {
+        id: "mission-d3",
+        title: "Cardio Blitz",
+        description: "Log a cardio workout today",
+        mission_type: "daily",
+        progress_type: "workout_count",
+        target: 1,
+        token_reward: 6,
+        icon: "🏃"
+    }, {
+        id: "mission-w5",
+        title: "Full Body Week",
+        description: "Train 5 different muscle groups this week",
+        mission_type: "weekly",
+        progress_type: "muscle_group_workouts",
+        target: 5,
+        token_reward: 35,
+        icon: "🌐"
+    }, {
+        id: "mission-w6",
+        title: "Dedicated Athlete",
+        description: "Complete 5 workouts this week",
+        mission_type: "weekly",
+        progress_type: "workout_count",
+        target: 5,
+        token_reward: 40,
+        icon: "⚡"
+    }, {
+        id: "mission-m4",
+        title: "Iron Month",
+        description: "Log 20+ workouts this month",
+        mission_type: "monthly",
+        progress_type: "workout_count",
+        target: 20,
+        token_reward: 120,
+        icon: "🛡️"
+    }, {
+        id: "mission-m5",
+        title: "Volume Giant",
+        description: "Log 500,000 kg total volume this month",
+        mission_type: "monthly",
+        progress_type: "total_volume_kg",
+        target: 500000,
+        token_reward: 150,
+        icon: "🗿"
+    }, {
+        id: "mission-c8",
+        title: "Volume Rookie",
+        description: "Log 10,000 kg total volume",
+        mission_type: "chain",
+        chain_order: 1,
+        progress_type: "total_volume_kg",
+        target: 10000,
+        token_reward: 20,
+        icon: "💧",
+        chain_name: "Volume Warrior"
+    }, {
+        id: "mission-c9",
+        title: "Volume Grinder",
+        description: "Log 100,000 kg total volume",
+        mission_type: "chain",
+        chain_order: 2,
+        progress_type: "total_volume_kg",
+        target: 100000,
+        token_reward: 60,
+        icon: "💦",
+        chain_name: "Volume Warrior"
+    }, {
+        id: "mission-c10",
+        title: "Volume God",
+        description: "Log 1,000,000 kg total volume",
+        mission_type: "chain",
+        chain_order: 3,
+        progress_type: "total_volume_kg",
+        target: 1000000,
+        token_reward: 200,
+        icon: "🌊",
+        chain_name: "Volume Warrior"
     }]
 }
 function seedCosmetics() {
@@ -6015,7 +6098,7 @@ function computeUserMissions() {
                 n = a, "weekly" === e.mission_type && (n = 0, i = h.toISOString());
                 break;
             case "total_volume_kg":
-                "daily" === e.mission_type ? (n = Math.round(u), i = g.toISOString()) : "weekly" === e.mission_type ? (n = Math.round(r), i = h.toISOString()) : "monthly" === e.mission_type && (n = Math.round(AppState.workouts.filter(e => new Date(e.date).getMonth() === m.getMonth()).reduce((e, t) => e + getTotalVolume(t), 0)), i = y.toISOString());
+                "daily" === e.mission_type ? (n = Math.round(u), i = g.toISOString()) : "weekly" === e.mission_type ? (n = Math.round(r), i = h.toISOString()) : "monthly" === e.mission_type ? (n = Math.round(AppState.workouts.filter(e => new Date(e.date).getMonth() === m.getMonth()).reduce((e, t) => e + getTotalVolume(t), 0)), i = y.toISOString()) : n = Math.round(AppState.workouts.reduce((e, t) => e + getTotalVolume(t), 0));
                 break;
             case "consecutive_days":
                 n = s, "monthly" === e.mission_type && (i = y.toISOString());
@@ -6435,47 +6518,182 @@ async function checkFraudAndEarnTokens(e, t) {
         t && (t.claimed || "claimed" === t.status) && (e.claimed = !0, e.status = "claimed")
     }), AppState.userMissions = h
 }
-function renderMissions(e) {
-    0 === AppState.missions.length && (AppState.missions = seedMissions()), 0 === AppState.userMissions.length && (AppState.userMissions = computeUserMissions());
-    const t = AppState.profile.is_beta_user,
-        a = AppState.userMissions.filter(e => e.mission && "daily" === e.mission.mission_type),
-        s = AppState.userMissions.filter(e => e.mission && "weekly" === e.mission.mission_type),
-        n = AppState.userMissions.filter(e => e.mission && "monthly" === e.mission.mission_type),
-        i = AppState.userMissions.filter(e => e.mission && "chain" === e.mission.mission_type);
-    function renderMissionCard(e) {
-        const t = e.mission;
-        if (!t) return "";
-        const a = Math.min(100, Math.round(e.progress / t.target * 100)),
-            s = "completed" === e.status && !e.claimed,
-            n = e.claimed || "claimed" === e.status,
-            i = e.expires_at ? (() => {
-                const t = Math.ceil((new Date(e.expires_at) - new Date) / 36e5);
-                return t < 1 ? "Expires soon" : t < 24 ? `${t}h left` : `${Math.ceil(t/24)}d left`
-            })() : "",
-            o = "total_volume_kg" === t.progress_type,
-            r = getUnitLabel(),
-            l = o ? Math.round(kgToDisplay(e.progress)) : e.progress,
-            d = o ? Math.round(kgToDisplay(t.target)) : t.target,
-            c = o ? t.description.replace(/([\d,]+)\s*kg/gi, (e, t) => {
-                const a = parseFloat(t.replace(/,/g, ""));
-                return Math.round(kgToDisplay(a)).toLocaleString() + " " + r
-            }) : t.description;
-        return `\n      <div class="mission-card ${n?"mission-claimed":""} ${s?"mission-claimable":""}">\n        <div class="mission-card-header">\n          <div class="mission-icon">${t.icon||"🎯"}</div>\n          <div class="mission-info">\n            <div class="mission-title">${t.title}</div>\n            <div class="mission-desc">${c}</div>\n            ${i?`<div class="mission-expires">${i}</div>`:""}\n          </div>\n          <div class="mission-reward">\n            <span class="token-reward">${t.token_reward}</span>\n            <span class="token-icon-sm">⬡</span>\n          </div>\n        </div>\n        <div class="mission-progress-row">\n          <div class="progress-bar-bg" style="flex:1;">\n            <div class="progress-bar-fill" style="width:${a}%;"></div>\n          </div>\n          <span class="mission-progress-label">${l}/${d}${o?" "+r:""}</span>\n          ${s?`<button class="btn btn-primary btn-sm mission-claim-btn" data-umid="${e.id}">Claim</button>`:""}\n          ${n?'<span class="mission-claimed-badge">✓ Claimed</span>':""}\n        </div>\n      </div>\n    `
+function renderMissions(container) {
+    if (AppState.missions.length === 0) AppState.missions = seedMissions();
+    if (AppState.userMissions.length === 0) AppState.userMissions = computeUserMissions();
+
+    const isBeta = AppState.profile.is_beta_user;
+    const allDaily   = AppState.userMissions.filter(m => m.mission && m.mission.mission_type === "daily");
+    const allWeekly  = AppState.userMissions.filter(m => m.mission && m.mission.mission_type === "weekly");
+    const allMonthly = AppState.userMissions.filter(m => m.mission && m.mission.mission_type === "monthly");
+    const allChain   = AppState.userMissions.filter(m => m.mission && m.mission.mission_type === "chain");
+
+    const claimableCount = AppState.userMissions.filter(m => m.status === "completed" && !m.claimed).length;
+
+    // Active tab state — "all" | "daily" | "weekly" | "monthly" | "chain"
+    let activeTab = "all";
+
+    function renderMissionCard(um) {
+        const mission = um.mission;
+        if (!mission) return "";
+        const pct = Math.min(100, Math.round(um.progress / mission.target * 100));
+        const isClaimable = um.status === "completed" && !um.claimed;
+        const isClaimed   = um.claimed || um.status === "claimed";
+        const unitLabel   = getUnitLabel();
+        const isVolume    = mission.progress_type === "total_volume_kg";
+        const dispProgress = isVolume ? Math.round(kgToDisplay(um.progress)).toLocaleString() : um.progress;
+        const dispTarget   = isVolume ? Math.round(kgToDisplay(mission.target)).toLocaleString() : mission.target;
+        const dispDesc = isVolume ? mission.description.replace(/([\d,]+)\s*kg/gi, (_, num) => {
+            return Math.round(kgToDisplay(parseFloat(num.replace(/,/g,"")))).toLocaleString() + " " + unitLabel;
+        }) : mission.description;
+        const timeLeft = um.expires_at ? (() => {
+            const h = Math.ceil((new Date(um.expires_at) - new Date) / 36e5);
+            return h < 1 ? "Expires soon" : h < 24 ? `${h}h left` : `${Math.ceil(h/24)}d left`;
+        })() : "";
+
+        // SVG progress ring
+        const r = 18, circ = 2 * Math.PI * r;
+        const dash = (pct / 100) * circ;
+        const ringColor = isClaimed ? "var(--text-tertiary)" : isClaimable ? "var(--accent)" : "var(--accent)";
+        const ring = `<svg width="44" height="44" viewBox="0 0 44 44" style="flex-shrink:0;">
+          <circle cx="22" cy="22" r="${r}" fill="none" stroke="var(--border-subtle)" stroke-width="4"/>
+          <circle cx="22" cy="22" r="${r}" fill="none" stroke="${ringColor}" stroke-width="4"
+            stroke-dasharray="${dash.toFixed(1)} ${circ.toFixed(1)}"
+            stroke-dashoffset="${(circ / 4).toFixed(1)}"
+            stroke-linecap="round"
+            style="transition:stroke-dasharray 0.4s ease;${isClaimed?"opacity:0.4":""}"/>
+          <text x="22" y="27" text-anchor="middle" font-size="11" font-weight="700"
+            fill="${isClaimed?"var(--text-tertiary)":isClaimable?"var(--accent)":"var(--text-primary)"}">${pct}%</text>
+        </svg>`;
+
+        return `
+      <div class="mission-card ${isClaimed?"mission-claimed":""} ${isClaimable?"mission-claimable":""}">
+        <div class="mission-card-header">
+          <div class="mission-icon">${mission.icon||"🎯"}</div>
+          <div class="mission-info" style="flex:1;min-width:0;">
+            <div class="mission-title">${mission.title}</div>
+            <div class="mission-desc">${dispDesc}</div>
+            ${timeLeft?`<div class="mission-expires">${timeLeft}</div>`:""}
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0;">
+            ${ring}
+            <div class="mission-reward">
+              <span class="token-reward">${mission.token_reward}</span>
+              <span class="token-icon-sm">⬡</span>
+            </div>
+          </div>
+        </div>
+        <div class="mission-progress-row" style="margin-top:8px;">
+          <div class="progress-bar-bg" style="flex:1;">
+            <div class="progress-bar-fill" style="width:${pct}%;"></div>
+          </div>
+          <span class="mission-progress-label">${dispProgress}/${dispTarget}${isVolume?" "+unitLabel:""}</span>
+          ${isClaimable?`<button class="btn btn-primary btn-sm mission-claim-btn" data-umid="${um.id}">Claim</button>`:""}
+          ${isClaimed?'<span class="mission-claimed-badge">✓ Claimed</span>':""}
+        </div>
+      </div>
+    `;
     }
-    function renderMissionSection(e, t, a) {
-        return 0 === t.length ? "" : `\n      <div class="mission-section">\n        <div class="mission-section-header">\n          <span class="mission-section-icon">${a}</span>\n          <h3 class="mission-section-title">${e}</h3>\n        </div>\n        ${t.map(renderMissionCard).join("")}\n      </div>\n    `
+
+    function renderSection(title, missions, icon, emptyMsg) {
+        return `
+      <div class="mission-section">
+        <div class="mission-section-header">
+          <span class="mission-section-icon">${icon}</span>
+          <h3 class="mission-section-title">${title}</h3>
+        </div>
+        ${missions.length > 0
+            ? missions.map(renderMissionCard).join("")
+            : `<div style="padding:14px 0;color:var(--text-tertiary);font-size:13px;">${emptyMsg}</div>`
+        }
+      </div>
+    `;
     }
-    const o = {};
-    i.forEach(e => {
-        const t = e.mission && e.mission.chain_name || "Epic Mission";
-        o[t] || (o[t] = []), o[t].push(e)
-    }), e.innerHTML = `\n    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:24px;">\n      <div>\n        <div class="page-title">Missions 🎯</div>\n        <div class="page-subtitle">Complete missions to earn ⬡ tokens</div>\n      </div>\n      <div class="token-balance-card">\n        <span class="token-balance-icon">⬡</span>\n        <span class="token-balance-amount token-balance-display">${AppState.tokenBalance}</span>\n        <span class="token-balance-label">tokens</span>\n        ${t?'<span class="badge-beta">BETA</span>':""}\n      </div>\n    </div>\n\n    <div id="missions-content">\n      ${renderMissionSection("Daily Missions",a,"☀️")}\n      ${renderMissionSection("Weekly Missions",s,"📅")}\n      ${renderMissionSection("Monthly Missions",n,"🏆")}\n      ${Object.entries(o).map(([e,t])=>`\n        <div class="mission-section epic-section">\n          <div class="mission-section-header">\n            <span class="mission-section-icon">⚡</span>\n            <h3 class="mission-section-title">Epic: ${e}</h3>\n          </div>\n          <div class="chain-missions-container">\n            ${t.map(renderMissionCard).join("")}\n          </div>\n        </div>\n      `).join("")}\n    </div>\n\n    ${0===a.length&&0===s.length?'\n      <div class="empty-state">\n        <div class="empty-state-icon">🎯</div>\n        <div class="empty-state-title">No missions available</div>\n        <div class="empty-state-text">Log some workouts to unlock missions!</div>\n        <a href="#/workout/new" class="btn btn-primary" style="margin-top:16px;">Start a Workout</a>\n      </div>\n    ':""}\n  `, e.querySelectorAll(".mission-claim-btn").forEach(t => {
-        t.addEventListener("click", async () => {
-            const a = t.dataset.umid;
-            t.disabled = !0, t.textContent = "Claiming...";
-            await sbClaimMission(a) ? renderMissions(e) : (t.disabled = !1, t.textContent = "Claim")
-        })
-    })
+
+    function renderContent() {
+        const chainGroups = {};
+        allChain.forEach(m => {
+            const name = (m.mission && m.mission.chain_name) || "Epic Mission";
+            if (!chainGroups[name]) chainGroups[name] = [];
+            chainGroups[name].push(m);
+        });
+
+        const tabs = [
+            { key: "all",     label: "All" },
+            { key: "daily",   label: "Daily" },
+            { key: "weekly",  label: "Weekly" },
+            { key: "monthly", label: "Monthly" },
+            { key: "chain",   label: "Chains" }
+        ];
+
+        const tabBar = `<div class="filter-row" style="margin-bottom:20px;">
+          ${tabs.map(tab => `<button class="filter-chip missions-tab ${activeTab===tab.key?"active":""}" data-tab="${tab.key}">${tab.label}</button>`).join("")}
+        </div>`;
+
+        let sectionsHtml = "";
+        if (activeTab === "all" || activeTab === "daily")
+            sectionsHtml += renderSection("Daily Missions", allDaily, "☀️", "No daily missions — keep training!");
+        if (activeTab === "all" || activeTab === "weekly")
+            sectionsHtml += renderSection("Weekly Missions", allWeekly, "📅", "No weekly missions — keep training!");
+        if (activeTab === "all" || activeTab === "monthly")
+            sectionsHtml += renderSection("Monthly Missions", allMonthly, "🏆", "No monthly missions — keep training!");
+        if (activeTab === "all" || activeTab === "chain") {
+            if (Object.keys(chainGroups).length === 0) {
+                sectionsHtml += renderSection("Epic Chains", [], "⚡", "No chain missions — keep training!");
+            } else {
+                Object.entries(chainGroups).forEach(([name, missions]) => {
+                    sectionsHtml += `
+                  <div class="mission-section epic-section">
+                    <div class="mission-section-header">
+                      <span class="mission-section-icon">⚡</span>
+                      <h3 class="mission-section-title">Epic: ${name}</h3>
+                    </div>
+                    <div class="chain-missions-container">
+                      ${missions.map(renderMissionCard).join("")}
+                    </div>
+                  </div>`;
+                });
+            }
+        }
+
+        return tabBar + `<div id="missions-content">${sectionsHtml}</div>`;
+    }
+
+    container.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:24px;">
+      <div>
+        <div class="page-title">Missions 🎯</div>
+        <div class="page-subtitle">Complete missions to earn ⬡ tokens${claimableCount > 0 ? ` &nbsp;<span style="background:var(--accent);color:#fff;border-radius:999px;font-size:11px;font-weight:700;padding:2px 8px;">${claimableCount} ready to claim</span>` : ""}</div>
+      </div>
+      <div class="token-balance-card">
+        <span class="token-balance-icon">⬡</span>
+        <span class="token-balance-amount token-balance-display">${AppState.tokenBalance || 0}</span>
+        <span class="token-balance-label">tokens</span>
+        ${isBeta ? '<span class="badge-beta">BETA</span>' : ""}
+      </div>
+    </div>
+    <div id="missions-shell">${renderContent()}</div>
+  `;
+
+    function attachListeners() {
+        container.querySelectorAll(".missions-tab").forEach(btn => {
+            btn.addEventListener("click", () => {
+                activeTab = btn.dataset.tab;
+                const shell = container.querySelector("#missions-shell");
+                if (shell) shell.innerHTML = renderContent();
+                attachListeners();
+            });
+        });
+        container.querySelectorAll(".mission-claim-btn").forEach(btn => {
+            btn.addEventListener("click", async () => {
+                const umid = btn.dataset.umid;
+                btn.disabled = true; btn.textContent = "Claiming...";
+                const ok = await sbClaimMission(umid);
+                if (ok) { renderMissions(container); } else { btn.disabled = false; btn.textContent = "Claim"; }
+            });
+        });
+    }
+    attachListeners();
 }
 function renderShop(e) {
     0 === AppState.cosmetics.length && (AppState.cosmetics = seedCosmetics());
