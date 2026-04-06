@@ -17,7 +17,7 @@ create table if not exists profiles (
   username text unique,
   email text,
   unit text not null default 'kg' check (unit in ('kg', 'lbs')),
-  token_balance integer not null default 10,
+  token_balance integer not null default 25,
   emoji text default '💪',
   created_at timestamptz default now(),
   updated_at timestamptz default now()

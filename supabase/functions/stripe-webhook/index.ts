@@ -53,6 +53,25 @@ Deno.serve(async (req) => {
       case 'checkout.session.completed': {
         const session = event.data.object;
         const userId = session.metadata?.supabase_user_id;
+        const sessionType = session.metadata?.type;
+
+        // ── Token bundle purchase ─────────────────────────────────────────
+        if (sessionType === 'token_bundle' && userId) {
+          const bundleId     = session.metadata?.bundle_id;
+          const tokensToGrant = parseInt(session.metadata?.tokens_to_grant || '0', 10);
+          if (tokensToGrant > 0) {
+            await supabase.rpc('increment_tokens', { uid: userId, delta: tokensToGrant });
+            await supabase.from('token_purchases').insert({
+              user_id: userId,
+              bundle_id: bundleId,
+              tokens_granted: tokensToGrant,
+              stripe_payment_intent_id: session.payment_intent,
+            });
+          }
+          break;
+        }
+
+        // ── Subscription checkout ─────────────────────────────────────────
         const planId  = session.metadata?.plan_id;
         if (!userId || !planId) break;
 
@@ -74,7 +93,7 @@ Deno.serve(async (req) => {
         }, { onConflict: 'user_id' });
 
         // Award welcome tokens based on plan
-        const bonusTokens = { weekly: 30, monthly: 50, quarterly: 75, yearly: 150 }[planId] || 0;
+        const bonusTokens = { weekly: 50, monthly: 100, quarterly: 175, yearly: 400 }[planId] || 0;
         if (bonusTokens > 0) {
           await supabase.rpc('increment_tokens', { uid: userId, delta: bonusTokens });
         }
