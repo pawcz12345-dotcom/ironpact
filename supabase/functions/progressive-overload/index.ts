@@ -33,7 +33,7 @@ Deno.serve(async (req) => {
     if (!exercise_name || !history?.length) return error('Missing exercise_name or history');
 
     // ── Token check ─────────────────────────────────────────────────────────
-    const COST = 2;
+    const COST = 15;
     const { data: profile, error: profErr } = await supabase
       .from('profiles')
       .select('token_balance')

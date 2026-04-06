@@ -22,6 +22,19 @@ const PLAN_PRICE_MAP: Record<string, string> = {
   yearly:    Deno.env.get('STRIPE_PRICE_YEARLY')    || '',
 };
 
+// Token bundle one-time price IDs — set STRIPE_PRICE_BUNDLE_* in Edge Function secrets
+const BUNDLE_PRICE_MAP: Record<string, string> = {
+  starter:    Deno.env.get('STRIPE_PRICE_BUNDLE_STARTER')    || '',  // 150 tokens — $0.99
+  power:      Deno.env.get('STRIPE_PRICE_BUNDLE_POWER')      || '',  // 400 tokens — $2.49
+  elite:      Deno.env.get('STRIPE_PRICE_BUNDLE_ELITE')      || '',  // 900 tokens — $4.99
+  champion:   Deno.env.get('STRIPE_PRICE_BUNDLE_CHAMPION')   || '',  // 2,000 tokens — $9.99
+  legendary:  Deno.env.get('STRIPE_PRICE_BUNDLE_LEGENDARY')  || '',  // 5,500 tokens — $24.99
+};
+
+const BUNDLE_TOKENS: Record<string, number> = {
+  starter: 150, power: 400, elite: 900, champion: 2000, legendary: 5500,
+};
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -42,7 +55,53 @@ Deno.serve(async (req) => {
     if (authErr || !user) return error('Unauthorized', 401);
 
     // ── Parse body ──────────────────────────────────────────────────────────
-    const { plan_id, return_url } = await req.json();
+    const { plan_id, bundle_id, return_url } = await req.json();
+
+    // ── Token bundle (one-time purchase) ───────────────────────────────────
+    if (bundle_id) {
+      const priceId = BUNDLE_PRICE_MAP[bundle_id];
+      if (!priceId) return error(`Unknown bundle: ${bundle_id}. Valid bundles: ${Object.keys(BUNDLE_PRICE_MAP).join(', ')}`);
+
+      const stripeKey = Deno.env.get('STRIPE_SECRET_KEY');
+      if (!stripeKey) return error('Stripe not configured.');
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('email, stripe_customer_id')
+        .eq('id', user.id)
+        .single();
+
+      let customerId: string | undefined = profile?.stripe_customer_id;
+      if (!customerId) {
+        const custRes = await stripeRequest(stripeKey, 'POST', '/customers', {
+          email: profile?.email || user.email,
+          metadata: { supabase_user_id: user.id },
+        });
+        customerId = custRes.id;
+        await supabase.from('profiles').update({ stripe_customer_id: customerId }).eq('id', user.id);
+      }
+
+      const baseUrl = return_url || 'https://ironpact-xi.vercel.app';
+      const session = await stripeRequest(stripeKey, 'POST', '/checkout/sessions', {
+        customer: customerId,
+        mode: 'payment',
+        line_items: [{ price: priceId, quantity: 1 }],
+        success_url: `${baseUrl}#/shop?checkout=success&bundle=${bundle_id}`,
+        cancel_url: `${baseUrl}#/shop?checkout=cancelled`,
+        metadata: {
+          supabase_user_id: user.id,
+          bundle_id,
+          tokens_to_grant: String(BUNDLE_TOKENS[bundle_id]),
+          type: 'token_bundle',
+        },
+      });
+
+      return new Response(JSON.stringify({ url: session.url }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // ── Subscription checkout ───────────────────────────────────────────────
     if (!plan_id || !PLAN_PRICE_MAP[plan_id]) {
       return error(`Unknown plan: ${plan_id}. Valid plans: ${Object.keys(PLAN_PRICE_MAP).join(', ')}`);
     }
