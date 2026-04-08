@@ -7474,7 +7474,7 @@ window.editWorkoutTimer = function() {
 };
 
 // ═══════════════════════════════════════════════════════════════
-// PATCH: AI Plan token cost display
+// PATCH: AI Plan Generator — real AI + token cost display
 // ═══════════════════════════════════════════════════════════════
 function calcPlanCost(days, experience, equipmentCount) {
   var base = { 3: 10, 4: 15, 5: 20, 6: 25 }[days] || 15;
@@ -7482,59 +7482,124 @@ function calcPlanCost(days, experience, equipmentCount) {
   return base + expBonus + (equipmentCount * 2);
 }
 
-(function patchAIPlanCost() {
-  var _origRenderAIPlanGenerator = renderAIPlanGenerator;
+async function callAIPlanAPI(goal, days, experience, equipment) {
+  if (!ANTHROPIC_API_KEY) {
+    return generateMockPlan(goal, days, experience, equipment);
+  }
+  var goalLabel = { strength: 'Strength', hypertrophy: 'Muscle Growth (Hypertrophy)', endurance: 'Muscular Endurance', fat_loss: 'Fat Loss', general: 'General Fitness' }[goal] || goal;
+  var availableExercises = (AppState.exercises || [])
+    .filter(function(ex) { return !equipment.length || equipment.includes(ex.equipment) || ex.equipment === 'bodyweight'; })
+    .map(function(ex) { return ex.name + ' (' + ex.muscle_group + ', ' + ex.equipment + ')'; });
+  var exPerDay = experience === 'beginner' ? 3 : experience === 'intermediate' ? 4 : 5;
+  var setsReps = { strength: { sets: '4-5', reps: '3-6', rest: 'Rest 3-5 min' }, hypertrophy: { sets: '3-4', reps: '8-12', rest: 'Rest 60-90s' }, endurance: { sets: '3', reps: '15-20', rest: 'Rest 30-45s' }, fat_loss: { sets: '3-4', reps: '10-15', rest: 'Rest 45-60s' }, general: { sets: '3', reps: '8-12', rest: 'Rest 60-90s' } }[goal] || { sets: '3', reps: '8-12', rest: 'Rest 60-90s' };
+  var prompt = 'Create a ' + days + '-day training plan for a ' + experience + ' athlete. Goal: ' + goalLabel + '. Equipment: ' + (equipment.join(', ') || 'bodyweight') + '.\n'
+    + 'Available exercises: ' + availableExercises.slice(0, 80).join('; ') + '.\n'
+    + 'Return ONLY valid JSON (no markdown) in this exact structure:\n'
+    + '{"name":"<plan name>","goal":"' + goal + '","days":[{"name":"Day 1 — <focus>","exercises":[{"name":"<exercise name>","muscle_group":"<chest|back|legs|shoulders|arms|core>","sets":"' + setsReps.sets + '","reps":"' + setsReps.reps + '","rest":"' + setsReps.rest + '"}]}]}\n'
+    + 'Include ' + exPerDay + ' exercises per day. Only use exercises from the provided list. Apply sound periodization.';
+  var resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+    body: JSON.stringify({ model: 'claude-haiku-4-5', max_tokens: 2000, system: 'You are an expert strength coach. Respond only with valid JSON, no markdown.', messages: [{ role: 'user', content: prompt }] })
+  });
+  if (!resp.ok) throw new Error('API error ' + resp.status);
+  var data = await resp.json();
+  var text = (data.content && data.content[0] && data.content[0].text) || '';
+  text = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
+  var plan = JSON.parse(text);
+  plan.days.forEach(function(day) {
+    day.exercises = (day.exercises || []).map(function(ex) {
+      var match = (AppState.exercises || []).find(function(e) { return e.name.toLowerCase() === ex.name.toLowerCase(); });
+      return { name: ex.name, exercise_id: match ? match.id : generateId(), muscle_group: ex.muscle_group, sets: ex.sets, reps: ex.reps, rest: ex.rest };
+    });
+  });
+  return plan;
+}
+
+(function patchAIPlanGenerator() {
+  var _orig = renderAIPlanGenerator;
   renderAIPlanGenerator = function renderAIPlanGenerator(container) {
-    _origRenderAIPlanGenerator(container);
+    _orig(container);
 
     var form = document.getElementById('plan-form');
-    if (!form) return;
+    if (!form) return; // plan output is showing, not the form
 
     var isBeta = AppState.profile && AppState.profile.is_beta_user;
 
-    // Insert cost display before submit button
-    var submitBtn = form.querySelector('button[type="submit"]');
-    if (!submitBtn) return;
+    // Clone form to replace the original submit handler with our AI one
+    var newForm = form.cloneNode(true);
+    form.parentNode.replaceChild(newForm, form);
+    form = newForm;
 
+    // Track selected equipment (sync from already-selected cards)
+    var selectedEquipment = [];
+    form.querySelectorAll('#plan-equipment .option-card').forEach(function(card) {
+      if (card.classList.contains('selected')) selectedEquipment.push(card.dataset.value);
+      card.addEventListener('click', function() {
+        var val = card.dataset.value;
+        var idx = selectedEquipment.indexOf(val);
+        if (idx >= 0) { selectedEquipment.splice(idx, 1); card.classList.remove('selected'); }
+        else { selectedEquipment.push(val); card.classList.add('selected'); }
+        setTimeout(updateCostDisplay, 10);
+      });
+    });
+
+    // Cost display
+    var submitBtn = form.querySelector('button[type="submit"]');
     var costRow = document.createElement('div');
-    costRow.id = 'plan-cost-row';
     costRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg-elevated);border-radius:var(--radius-md);margin-bottom:12px;border:1px solid var(--border-subtle);';
     form.insertBefore(costRow, submitBtn);
 
-    function getEquipmentCount() {
-      return form.querySelectorAll('#plan-equipment .option-card.selected').length || 1;
-    }
-
     function updateCostDisplay() {
-      var days = parseInt(document.getElementById('plan-days').value) || 4;
-      var exp = (document.getElementById('plan-exp').value) || 'beginner';
-      var eqCount = getEquipmentCount();
-      var cost = calcPlanCost(days, exp, eqCount);
+      var days = parseInt(form.querySelector('#plan-days').value) || 4;
+      var exp = form.querySelector('#plan-exp').value || 'beginner';
+      var cost = calcPlanCost(days, exp, selectedEquipment.length || 1);
       var balance = AppState.tokenBalance || 0;
       var canAfford = isBeta || balance >= cost;
-
       costRow.innerHTML = '<span style="font-size:13px;color:var(--text-secondary);">Cost to generate</span>'
         + '<span style="display:flex;align-items:center;gap:6px;">'
         + (isBeta
-            ? '<span style="color:var(--success);font-weight:700;font-size:13px;">FREE</span>'
-              + '<span style="text-decoration:line-through;color:var(--text-tertiary);font-size:12px;">' + cost + ' ⬡</span>'
-            : '<span style="font-size:16px;font-weight:800;color:' + (canAfford ? 'var(--text-primary)' : 'var(--danger)') + ';">'
-              + cost
-              + '</span><span style="font-size:13px;color:var(--accent);">⬡</span>'
-              + (!canAfford ? '<span style="font-size:11px;color:var(--danger);margin-left:4px;">(need ' + (cost - balance) + ' more)</span>' : '')
-          )
+            ? '<span style="color:var(--success);font-weight:700;font-size:13px;">FREE</span><span style="text-decoration:line-through;color:var(--text-tertiary);font-size:12px;">' + cost + ' ⬡</span>'
+            : '<span style="font-size:16px;font-weight:800;color:' + (canAfford ? 'var(--text-primary)' : 'var(--danger)') + ';">' + cost + '</span><span style="font-size:13px;color:var(--accent);">⬡</span>'
+              + (!canAfford ? '<span style="font-size:11px;color:var(--danger);margin-left:4px;">(need ' + (cost - balance) + ' more)</span>' : ''))
         + '</span>';
-
       submitBtn.disabled = !canAfford && !isBeta;
       submitBtn.style.opacity = (!canAfford && !isBeta) ? '0.5' : '';
     }
 
     updateCostDisplay();
+    form.querySelector('#plan-days').addEventListener('change', updateCostDisplay);
+    form.querySelector('#plan-exp').addEventListener('change', updateCostDisplay);
 
-    document.getElementById('plan-days').addEventListener('change', updateCostDisplay);
-    document.getElementById('plan-exp').addEventListener('change', updateCostDisplay);
-    form.querySelector('#plan-equipment').addEventListener('click', function() {
-      setTimeout(updateCostDisplay, 10);
+    // AI-powered submit handler
+    form.addEventListener('submit', async function(ev) {
+      ev.preventDefault();
+      var goal = form.querySelector('#plan-goal').value;
+      var days = parseInt(form.querySelector('#plan-days').value);
+      var experience = form.querySelector('#plan-exp').value;
+      var equipment = selectedEquipment.slice();
+      if (!goal) { showToast('Please select a training goal', 'error'); return; }
+      var cost = isBeta ? 0 : calcPlanCost(days, experience, equipment.length || 1);
+      if (!isBeta && (AppState.tokenBalance || 0) < cost) { showToast('Not enough tokens!', 'error'); return; }
+      if (!isBeta && cost > 0) await sbSpendTokens(cost, 'ai_plan');
+      container.innerHTML = '<div class="generating-animation"><div class="generating-spinner"></div><div class="generating-text">Generating your plan...</div><div class="generating-sub">AI is crafting a ' + days + '-day ' + goal + ' program</div></div>';
+      try {
+        var plan = await callAIPlanAPI(goal, days, experience, equipment);
+        plan.experience = experience;
+        plan.equipment = equipment;
+        var saved = await sbSavePlan(plan);
+        AppState.generatedPlan = saved || plan;
+        renderAIPlanGenerator(container);
+      } catch (err) {
+        console.error('[AI Plan] Error:', err);
+        showToast('AI unavailable — using template plan', 'error');
+        if (!isBeta && cost > 0) await sbEarnTokens(cost, 'plan_refund');
+        var fallback = generateMockPlan(goal, days, experience, equipment);
+        fallback.experience = experience; fallback.equipment = equipment;
+        var savedFallback = await sbSavePlan(fallback);
+        AppState.generatedPlan = savedFallback || fallback;
+        renderAIPlanGenerator(container);
+      }
     });
   };
 })();
