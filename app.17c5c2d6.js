@@ -7472,3 +7472,69 @@ window.editWorkoutTimer = function() {
   if (timerEl) timerEl.textContent = formatTime(newSecs);
   showToast('Timer updated \u2713');
 };
+
+// ═══════════════════════════════════════════════════════════════
+// PATCH: AI Plan token cost display
+// ═══════════════════════════════════════════════════════════════
+function calcPlanCost(days, experience, equipmentCount) {
+  var base = { 3: 10, 4: 15, 5: 20, 6: 25 }[days] || 15;
+  var expBonus = { beginner: 0, intermediate: 5, advanced: 10 }[experience] || 0;
+  return base + expBonus + (equipmentCount * 2);
+}
+
+(function patchAIPlanCost() {
+  var _origRenderAIPlanGenerator = renderAIPlanGenerator;
+  renderAIPlanGenerator = function renderAIPlanGenerator(container) {
+    _origRenderAIPlanGenerator(container);
+
+    var form = document.getElementById('plan-form');
+    if (!form) return;
+
+    var isBeta = AppState.profile && AppState.profile.is_beta_user;
+
+    // Insert cost display before submit button
+    var submitBtn = form.querySelector('button[type="submit"]');
+    if (!submitBtn) return;
+
+    var costRow = document.createElement('div');
+    costRow.id = 'plan-cost-row';
+    costRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg-elevated);border-radius:var(--radius-md);margin-bottom:12px;border:1px solid var(--border-subtle);';
+    form.insertBefore(costRow, submitBtn);
+
+    function getEquipmentCount() {
+      return form.querySelectorAll('#plan-equipment .option-card.selected').length || 1;
+    }
+
+    function updateCostDisplay() {
+      var days = parseInt(document.getElementById('plan-days').value) || 4;
+      var exp = (document.getElementById('plan-exp').value) || 'beginner';
+      var eqCount = getEquipmentCount();
+      var cost = calcPlanCost(days, exp, eqCount);
+      var balance = AppState.tokenBalance || 0;
+      var canAfford = isBeta || balance >= cost;
+
+      costRow.innerHTML = '<span style="font-size:13px;color:var(--text-secondary);">Cost to generate</span>'
+        + '<span style="display:flex;align-items:center;gap:6px;">'
+        + (isBeta
+            ? '<span style="color:var(--success);font-weight:700;font-size:13px;">FREE</span>'
+              + '<span style="text-decoration:line-through;color:var(--text-tertiary);font-size:12px;">' + cost + ' ⬡</span>'
+            : '<span style="font-size:16px;font-weight:800;color:' + (canAfford ? 'var(--text-primary)' : 'var(--danger)') + ';">'
+              + cost
+              + '</span><span style="font-size:13px;color:var(--accent);">⬡</span>'
+              + (!canAfford ? '<span style="font-size:11px;color:var(--danger);margin-left:4px;">(need ' + (cost - balance) + ' more)</span>' : '')
+          )
+        + '</span>';
+
+      submitBtn.disabled = !canAfford && !isBeta;
+      submitBtn.style.opacity = (!canAfford && !isBeta) ? '0.5' : '';
+    }
+
+    updateCostDisplay();
+
+    document.getElementById('plan-days').addEventListener('change', updateCostDisplay);
+    document.getElementById('plan-exp').addEventListener('change', updateCostDisplay);
+    form.querySelector('#plan-equipment').addEventListener('click', function() {
+      setTimeout(updateCostDisplay, 10);
+    });
+  };
+})();
