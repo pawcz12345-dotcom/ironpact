@@ -266,3 +266,85 @@ create trigger update_sessions_updated_at
 
 -- Allow users to insert their own profile (needed for first sign-in)
 create policy "profiles_insert_own" on profiles for insert with check (auth.uid() = id);
+
+-- ============================================================
+-- MISSIONS
+-- ============================================================
+
+-- Mission definitions (shared catalog, admin-managed)
+create table if not exists missions (
+  id text primary key,
+  title text not null,
+  description text,
+  mission_type text not null check (mission_type in ('daily','weekly','monthly','chain')),
+  progress_type text not null,
+  target integer not null,
+  token_reward integer not null default 5,
+  icon text,
+  chain_order integer,
+  chain_name text,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+alter table missions enable row level security;
+create policy "missions_read_authenticated" on missions
+  for select using (auth.uid() is not null);
+
+-- User mission progress
+create table if not exists user_missions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references profiles(id) on delete cascade not null,
+  mission_id text references missions(id) not null,
+  progress numeric not null default 0,
+  status text not null default 'in_progress' check (status in ('in_progress','completed','claimed','expired')),
+  claimed boolean not null default false,
+  expires_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique(user_id, mission_id)
+);
+
+alter table user_missions enable row level security;
+create policy "user_missions_own" on user_missions
+  using (auth.uid() = user_id);
+create policy "user_missions_insert_own" on user_missions
+  for insert with check (auth.uid() = user_id);
+create policy "user_missions_update_own" on user_missions
+  for update using (auth.uid() = user_id);
+
+drop trigger if exists update_user_missions_updated_at on user_missions;
+create trigger update_user_missions_updated_at
+  before update on user_missions
+  for each row execute procedure update_updated_at_column();
+
+-- ============================================================
+-- SEED: Mission definitions
+-- ============================================================
+insert into missions (id, title, description, mission_type, progress_type, target, token_reward, icon, chain_order, chain_name)
+values
+  ('mission-d1','Daily Grind','Complete 1 workout today','daily','workout_count',1,5,'💪',null,null),
+  ('mission-d2','Volume Crusher','Log 5,000 kg total volume today','daily','total_volume_kg',5000,8,'📊',null,null),
+  ('mission-d3','Cardio Blitz','Log a cardio workout today','daily','workout_count',1,6,'🏃',null,null),
+  ('mission-w1','Iron Week','Complete 4 workouts this week','weekly','workout_count',4,20,'🗓️',null,null),
+  ('mission-w2','PR Hunter','Set 3 personal records this week','weekly','pr_count',3,25,'🏆',null,null),
+  ('mission-w3','Balanced Builder','Train 3 different muscle groups this week','weekly','muscle_group_workouts',3,15,'⚖️',null,null),
+  ('mission-w4','Volume King','Accumulate 30,000 kg this week','weekly','total_volume_kg',30000,30,'👑',null,null),
+  ('mission-w5','Full Body Week','Train 5 different muscle groups this week','weekly','muscle_group_workouts',5,35,'🌐',null,null),
+  ('mission-w6','Dedicated Athlete','Complete 5 workouts this week','weekly','workout_count',5,40,'⚡',null,null),
+  ('mission-m1','Consistency Champion','Train 16+ times this month','monthly','workout_count',16,75,'🏅',null,null),
+  ('mission-m2','Streak Master','Maintain a 7-day consecutive streak','monthly','consecutive_days',7,50,'🔥',null,null),
+  ('mission-m3','Volume Legend','Log 120,000 kg total volume this month','monthly','total_volume_kg',120000,100,'⚡',null,null),
+  ('mission-m4','Iron Month','Log 20+ workouts this month','monthly','workout_count',20,120,'🛡️',null,null),
+  ('mission-m5','Volume Giant','Log 500,000 kg total volume this month','monthly','total_volume_kg',500000,150,'🗿',null,null),
+  ('mission-c1','Forge Beginner','Complete your first 5 workouts','chain','workout_count',5,15,'⬡',1,'The Forge Path'),
+  ('mission-c2','Forge Apprentice','Reach 25 total workouts','chain','workout_count',25,30,'🔨',2,'The Forge Path'),
+  ('mission-c3','Forge Master','Reach 100 total workouts','chain','workout_count',100,100,'⚒️',3,'The Forge Path'),
+  ('mission-c4','PR Seeker','Set your first personal record','chain','pr_count',1,10,'🌟',1,'PR Legend'),
+  ('mission-c5','PR Collector','Set 10 personal records','chain','pr_count',10,40,'💫',2,'PR Legend'),
+  ('mission-c6','PR Legend','Set 50 personal records','chain','pr_count',50,150,'🏆',3,'PR Legend'),
+  ('mission-c7','Early Adopter','Join IronPact during beta','chain','workout_count',1,50,'🎖️',1,'Founding Member'),
+  ('mission-c8','Volume Rookie','Log 10,000 kg total volume','chain','total_volume_kg',10000,20,'💧',1,'Volume Warrior'),
+  ('mission-c9','Volume Grinder','Log 100,000 kg total volume','chain','total_volume_kg',100000,60,'💦',2,'Volume Warrior'),
+  ('mission-c10','Volume God','Log 1,000,000 kg total volume','chain','total_volume_kg',1000000,200,'🌊',3,'Volume Warrior')
+on conflict (id) do nothing;

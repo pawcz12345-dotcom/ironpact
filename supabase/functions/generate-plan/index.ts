@@ -4,6 +4,7 @@
 //   action: 'suggest_swap'  — suggest 3 exercise swaps with reasoning
 // Requires: ANTHROPIC_API_KEY secret
 
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -32,14 +33,22 @@ Deno.serve(async (req) => {
   }
 
   try {
-    console.log('[generate-plan] request received');
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) return fail('Unauthorized', 401);
+
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const { data: { user }, error: authErr } = await supabase.auth.getUser();
+    if (authErr || !user) return fail('Unauthorized', 401);
 
     const body = await req.json();
     const action = body.action || 'generate';
-    console.log('[generate-plan] action:', action, '| goal:', (body as Record<string, unknown>).goal);
 
     const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
-    console.log('[generate-plan] API key present:', !!apiKey);
     if (!apiKey) return fail('ANTHROPIC_API_KEY not configured', 500);
 
     if (action === 'suggest_swap') {
@@ -109,7 +118,7 @@ async function handleGenerate(body: Record<string, unknown>, apiKey: string) {
   if (q.weakPoints && q.weakPoints.length > 0) notes.push(`Weak points to prioritise: ${q.weakPoints.join(', ')}`);
   if (notes.length > 0) notesSection = `\nAthlete notes:\n${notes.map(n => `  • ${n}`).join('\n')}`;
 
-  // Build weak points enforcement instruction
+  // Build weak points instruction
   const weakPoints = q.weakPoints && q.weakPoints.length > 0 ? q.weakPoints : [];
   const weakPointsInstruction = weakPoints.length > 0
     ? `\nWEAK POINTS: The athlete wants to prioritise ${weakPoints.join(', ')}. Add extra weekly volume for these muscles — include more sets and exercises targeting them across the plan where it fits the day's focus. Do NOT force these muscles into every single day; follow smart programming.`
