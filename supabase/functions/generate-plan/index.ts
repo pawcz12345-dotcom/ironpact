@@ -63,7 +63,7 @@ async function handleGenerate(body: Record<string, unknown>, apiKey: string) {
     experience: string;
     equipment: string[];
     exercises: { name: string; muscle_group?: string; equipment?: string }[];
-    questionnaire?: { sessionLength?: number; injuries?: string; weakPoints?: string[] };
+    questionnaire?: { sessionLength?: number; injuries?: string; weakPoints?: string[]; splitType?: string; customSplit?: string };
     history?: { date: string; name: string; exercises: { name: string; topSet?: { weight_kg?: number; reps?: number } }[] }[];
     prs?: { exercise: string; weight: number; reps: number }[];
   };
@@ -115,10 +115,27 @@ async function handleGenerate(body: Record<string, unknown>, apiKey: string) {
     ? `\nMANDATORY: The athlete has identified these weak points: ${weakPoints.join(', ')}. You MUST include at least one exercise directly targeting each weak point in every day of the plan. This is non-negotiable.`
     : '';
 
+  // Build split instruction
+  const SPLIT_LABELS: Record<string, string> = {
+    ppl: 'Push / Pull / Legs',
+    upper_lower: 'Upper / Lower',
+    full_body: 'Full Body',
+    bro: 'Bro Split (one muscle group per day)',
+    custom: '',
+  };
+  let splitInstruction = '';
+  const splitType = q.splitType || 'ai';
+  if (splitType === 'custom' && q.customSplit) {
+    splitInstruction = `\nMANDATORY: Structure the plan exactly as the athlete specified: "${q.customSplit}". Name each day accordingly and select exercises that match each day's focus.`;
+  } else if (splitType && splitType !== 'ai' && SPLIT_LABELS[splitType]) {
+    splitInstruction = `\nMANDATORY: Use a ${SPLIT_LABELS[splitType]} split. Name and organise each day accordingly.`;
+  }
+
   const prompt =
     `Create a ${days}-day training plan for a ${experience} athlete. Goal: ${goalLabel}. Equipment: ${equipmentList.join(', ') || 'bodyweight'}.` +
     historySection + prsSection + notesSection +
     `\n\nAvailable exercises: ${availableExercises.join('; ')}.` +
+    splitInstruction +
     weakPointsInstruction +
     `\n\nReturn ONLY valid JSON (no markdown) in this exact structure:` +
     `\n{"name":"<plan name>","goal":"${goal}","days":[{"name":"Day 1 — <focus>","exercises":[{"name":"<exercise name>","muscle_group":"<chest|back|legs|shoulders|arms|core>","sets":"${sr.sets}","reps":"${sr.reps}","rest":"${sr.rest}"}]}]}` +
