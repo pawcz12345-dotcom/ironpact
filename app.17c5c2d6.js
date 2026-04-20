@@ -7483,30 +7483,21 @@ function calcPlanCost(days, experience, equipmentCount) {
 }
 
 async function callAIPlanAPI(goal, days, experience, equipment) {
-  if (!ANTHROPIC_API_KEY) {
+  if (!supabaseClient) {
     return generateMockPlan(goal, days, experience, equipment);
   }
-  var goalLabel = { strength: 'Strength', hypertrophy: 'Muscle Growth (Hypertrophy)', endurance: 'Muscular Endurance', fat_loss: 'Fat Loss', general: 'General Fitness' }[goal] || goal;
-  var availableExercises = (AppState.exercises || [])
-    .filter(function(ex) { return !equipment.length || equipment.includes(ex.equipment) || ex.equipment === 'bodyweight'; })
-    .map(function(ex) { return ex.name + ' (' + ex.muscle_group + ', ' + ex.equipment + ')'; });
-  var exPerDay = experience === 'beginner' ? 3 : experience === 'intermediate' ? 4 : 5;
-  var setsReps = { strength: { sets: '4-5', reps: '3-6', rest: 'Rest 3-5 min' }, hypertrophy: { sets: '3-4', reps: '8-12', rest: 'Rest 60-90s' }, endurance: { sets: '3', reps: '15-20', rest: 'Rest 30-45s' }, fat_loss: { sets: '3-4', reps: '10-15', rest: 'Rest 45-60s' }, general: { sets: '3', reps: '8-12', rest: 'Rest 60-90s' } }[goal] || { sets: '3', reps: '8-12', rest: 'Rest 60-90s' };
-  var prompt = 'Create a ' + days + '-day training plan for a ' + experience + ' athlete. Goal: ' + goalLabel + '. Equipment: ' + (equipment.join(', ') || 'bodyweight') + '.\n'
-    + 'Available exercises: ' + availableExercises.slice(0, 80).join('; ') + '.\n'
-    + 'Return ONLY valid JSON (no markdown) in this exact structure:\n'
-    + '{"name":"<plan name>","goal":"' + goal + '","days":[{"name":"Day 1 — <focus>","exercises":[{"name":"<exercise name>","muscle_group":"<chest|back|legs|shoulders|arms|core>","sets":"' + setsReps.sets + '","reps":"' + setsReps.reps + '","rest":"' + setsReps.rest + '"}]}]}\n'
-    + 'Include ' + exPerDay + ' exercises per day. Only use exercises from the provided list. Apply sound periodization.';
-  var resp = await fetch('https://api.anthropic.com/v1/messages', {
+  var sessionData = await supabaseClient.auth.getSession();
+  var token = sessionData && sessionData.data && sessionData.data.session && sessionData.data.session.access_token;
+  if (!token) return generateMockPlan(goal, days, experience, equipment);
+  var resp = await fetch(SUPABASE_URL + '/functions/v1/generate-plan', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-    body: JSON.stringify({ model: 'claude-haiku-4-5', max_tokens: 2000, system: 'You are an expert strength coach. Respond only with valid JSON, no markdown.', messages: [{ role: 'user', content: prompt }] })
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify({ goal: goal, days: days, experience: experience, equipment: equipment, exercises: AppState.exercises || [] })
   });
   if (!resp.ok) throw new Error('API error ' + resp.status);
   var data = await resp.json();
-  var text = (data.content && data.content[0] && data.content[0].text) || '';
-  text = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
-  var plan = JSON.parse(text);
+  if (data.error) throw new Error(data.error);
+  var plan = data.plan;
   plan.days.forEach(function(day) {
     day.exercises = (day.exercises || []).map(function(ex) {
       var match = (AppState.exercises || []).find(function(e) { return e.name.toLowerCase() === ex.name.toLowerCase(); });
