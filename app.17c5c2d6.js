@@ -7587,19 +7587,25 @@ async function getAISwapSuggestions(exercise, reason, muscleGroup) {
     // Questionnaire fields
     var questionnaire = { sessionLength: 60, injuries: '', weakPoints: [], splitType: 'ai', customSplit: '' };
     var submitBtn = form.querySelector('button[type="submit"]');
-    var qSection = document.createElement('div');
-    qSection.innerHTML =
-      '<div class="form-group" style="margin-top:16px;">'
-      + '<label class="form-label">Training Split</label>'
+
+    // Training Split (injected as its own element so it renders independently)
+    var splitSection = document.createElement('div');
+    splitSection.className = 'form-group';
+    splitSection.style.marginTop = '16px';
+    splitSection.innerHTML =
+      '<label class="form-label">Training Split</label>'
       + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;">'
       + [['ai','AI decides'],['ppl','Push / Pull / Legs'],['upper_lower','Upper / Lower'],['full_body','Full Body'],['bro','Bro Split'],['custom','Custom...']]
           .map(function(s) {
             return '<button type="button" class="btn btn-secondary btn-sm plan-split-btn' + (s[0]==='ai'?' active':'') + '" data-split="' + s[0] + '" style="' + (s[0]==='ai'?'border-color:var(--accent);color:var(--accent);':'') + '">' + s[1] + '</button>';
           }).join('')
       + '</div>'
-      + '<textarea id="plan-custom-split" class="form-input" placeholder="Describe your split, e.g. Day 1: Chest & Triceps, Day 2: Back & Biceps, Day 3: Legs & Core..." style="display:none;margin-top:8px;height:72px;resize:vertical;"></textarea>'
-      + '</div>'
-      + '<div class="form-group" style="margin-top:12px;">'
+      + '<textarea id="plan-custom-split" class="form-input" placeholder="Describe your split, e.g. Day 1: Chest & Triceps, Day 2: Back & Biceps, Day 3: Legs & Core..." style="display:none;margin-top:8px;height:72px;resize:vertical;"></textarea>';
+    form.insertBefore(splitSection, submitBtn);
+
+    var qSection = document.createElement('div');
+    qSection.innerHTML =
+      '<div class="form-group" style="margin-top:12px;">'
       + '<label class="form-label">Session length</label>'
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;">'
       + ['45','60','75','90'].map(function(m) {
@@ -7620,12 +7626,12 @@ async function getAISwapSuggestions(exercise, reason, muscleGroup) {
     form.insertBefore(qSection, submitBtn);
 
     // Split buttons
-    form.querySelectorAll('.plan-split-btn').forEach(function(btn) {
+    splitSection.querySelectorAll('.plan-split-btn').forEach(function(btn) {
       btn.addEventListener('click', function() {
-        form.querySelectorAll('.plan-split-btn').forEach(function(b) { b.classList.remove('active'); b.style.borderColor = ''; b.style.color = ''; });
+        splitSection.querySelectorAll('.plan-split-btn').forEach(function(b) { b.classList.remove('active'); b.style.borderColor = ''; b.style.color = ''; });
         btn.classList.add('active'); btn.style.borderColor = 'var(--accent)'; btn.style.color = 'var(--accent)';
         questionnaire.splitType = btn.dataset.split;
-        var customArea = form.querySelector('#plan-custom-split');
+        var customArea = splitSection.querySelector('#plan-custom-split');
         if (customArea) customArea.style.display = btn.dataset.split === 'custom' ? '' : 'none';
       });
     });
@@ -7688,7 +7694,7 @@ async function getAISwapSuggestions(exercise, reason, muscleGroup) {
       var experience = form.querySelector('#plan-exp').value;
       var equipment = selectedEquipment.slice();
       questionnaire.injuries = (form.querySelector('#plan-injuries') || {}).value || '';
-      questionnaire.customSplit = (form.querySelector('#plan-custom-split') || {}).value || '';
+      questionnaire.customSplit = (splitSection.querySelector('#plan-custom-split') || form.querySelector('#plan-custom-split') || {}).value || '';
       if (!goal) { showToast('Please select a training goal', 'error'); return; }
       var cost = isBeta ? 0 : calcPlanCost(days, experience, equipment.length || 1);
       if (!isBeta && (AppState.tokenBalance || 0) < cost) { showToast('Not enough tokens!', 'error'); return; }
