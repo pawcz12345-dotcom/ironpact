@@ -7700,31 +7700,48 @@ function calcPlanCost(days, experience, equipmentCount) {
   return base + expBonus + (equipmentCount * 2);
 }
 
-async function callAIPlanAPI(goal, days, experience, equipment) {
-  if (!ANTHROPIC_API_KEY) {
-    return generateMockPlan(goal, days, experience, equipment);
-  }
-  var goalLabel = { strength: 'Strength', hypertrophy: 'Muscle Growth (Hypertrophy)', endurance: 'Muscular Endurance', fat_loss: 'Fat Loss', general: 'General Fitness' }[goal] || goal;
-  var availableExercises = (AppState.exercises || [])
-    .filter(function(ex) { return !equipment.length || equipment.includes(ex.equipment) || ex.equipment === 'bodyweight'; })
-    .map(function(ex) { return ex.name + ' (' + ex.muscle_group + ', ' + ex.equipment + ')'; });
-  var exPerDay = experience === 'beginner' ? 3 : experience === 'intermediate' ? 4 : 5;
-  var setsReps = { strength: { sets: '4-5', reps: '3-6', rest: 'Rest 3-5 min' }, hypertrophy: { sets: '3-4', reps: '8-12', rest: 'Rest 60-90s' }, endurance: { sets: '3', reps: '15-20', rest: 'Rest 30-45s' }, fat_loss: { sets: '3-4', reps: '10-15', rest: 'Rest 45-60s' }, general: { sets: '3', reps: '8-12', rest: 'Rest 60-90s' } }[goal] || { sets: '3', reps: '8-12', rest: 'Rest 60-90s' };
-  var prompt = 'Create a ' + days + '-day training plan for a ' + experience + ' athlete. Goal: ' + goalLabel + '. Equipment: ' + (equipment.join(', ') || 'bodyweight') + '.\n'
-    + 'Available exercises: ' + availableExercises.slice(0, 80).join('; ') + '.\n'
-    + 'Return ONLY valid JSON (no markdown) in this exact structure:\n'
-    + '{"name":"<plan name>","goal":"' + goal + '","days":[{"name":"Day 1 — <focus>","exercises":[{"name":"<exercise name>","muscle_group":"<chest|back|legs|shoulders|arms|core>","sets":"' + setsReps.sets + '","reps":"' + setsReps.reps + '","rest":"' + setsReps.rest + '"}]}]}\n'
-    + 'Include ' + exPerDay + ' exercises per day. Only use exercises from the provided list. Apply sound periodization.';
-  var resp = await fetch('https://api.anthropic.com/v1/messages', {
+async function callAIPlanAPI(goal, days, experience, equipment, questionnaire) {
+  if (!supabaseClient) throw new Error('Not connected — please reload');
+  var sessionData = await supabaseClient.auth.getSession();
+  var token = sessionData && sessionData.data && sessionData.data.session && sessionData.data.session.access_token;
+  if (!token) throw new Error('Not logged in — please log out and back in');
+
+  // Build history summary from last 8 workouts
+  var history = (AppState.workouts || []).slice(0, 8).map(function(w) {
+    return {
+      date: w.date,
+      name: w.name || 'Workout',
+      exercises: (w.exercises || []).slice(0, 5).map(function(ex) {
+        var sets = ex.sets || [];
+        var topSet = sets.reduce(function(best, s) { return (s.weight_kg || 0) > (best.weight_kg || 0) ? s : best; }, {});
+        return { name: ex.name, topSet: topSet.weight_kg ? { weight_kg: topSet.weight_kg, reps: topSet.reps } : null };
+      })
+    };
+  });
+
+  // Build PRs summary
+  var prs = Object.entries(AppState.personalRecords || {}).map(function(entry) {
+    var exId = entry[0], pr = entry[1];
+    var ex = (AppState.exercises || []).find(function(e) { return e.id === exId; });
+    return ex ? { exercise: ex.name, weight: pr.weight_kg, reps: pr.reps } : null;
+  }).filter(Boolean).slice(0, 15);
+
+  var resp = await fetch(SUPABASE_URL + '/functions/v1/generate-plan', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-    body: JSON.stringify({ model: 'claude-haiku-4-5', max_tokens: 2000, system: 'You are an expert strength coach. Respond only with valid JSON, no markdown.', messages: [{ role: 'user', content: prompt }] })
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify({
+      action: 'generate',
+      goal: goal, days: days, experience: experience, equipment: equipment,
+      exercises: AppState.exercises || [],
+      questionnaire: questionnaire || {},
+      history: history,
+      prs: prs
+    })
   });
   if (!resp.ok) throw new Error('API error ' + resp.status);
   var data = await resp.json();
-  var text = (data.content && data.content[0] && data.content[0].text) || '';
-  text = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
-  var plan = JSON.parse(text);
+  if (data.error) throw new Error(data.error);
+  var plan = data.plan;
   plan.days.forEach(function(day) {
     day.exercises = (day.exercises || []).map(function(ex) {
       var match = (AppState.exercises || []).find(function(e) { return e.name.toLowerCase() === ex.name.toLowerCase(); });
@@ -7734,22 +7751,45 @@ async function callAIPlanAPI(goal, days, experience, equipment) {
   return plan;
 }
 
+async function getAISwapSuggestions(exercise, reason, muscleGroup) {
+  if (!supabaseClient) return [];
+  var sessionData = await supabaseClient.auth.getSession();
+  var token = sessionData && sessionData.data && sessionData.data.session && sessionData.data.session.access_token;
+  if (!token) return [];
+  try {
+    var available = (AppState.exercises || [])
+      .filter(function(e) { return e.muscle_group === muscleGroup && e.name !== exercise.name; })
+      .map(function(e) { return { name: e.name, equipment: e.equipment }; });
+    var resp = await fetch(SUPABASE_URL + '/functions/v1/generate-plan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ action: 'suggest_swap', exercise: exercise.name, reason: reason, muscle_group: muscleGroup, available_exercises: available })
+    });
+    if (!resp.ok) return [];
+    var data = await resp.json();
+    return data.suggestions || [];
+  } catch (e) {
+    console.error('[AI Swap] Error:', e);
+    return [];
+  }
+}
+
 (function patchAIPlanGenerator() {
   var _orig = renderAIPlanGenerator;
   renderAIPlanGenerator = function renderAIPlanGenerator(container) {
     _orig(container);
 
     var form = document.getElementById('plan-form');
-    if (!form) return; // plan output is showing, not the form
+    if (!form) return;
 
     var isBeta = AppState.profile && AppState.profile.is_beta_user;
 
-    // Clone form to replace the original submit handler with our AI one
+    // Clone to remove old submit handler
     var newForm = form.cloneNode(true);
     form.parentNode.replaceChild(newForm, form);
     form = newForm;
 
-    // Track selected equipment (sync from already-selected cards)
+    // Track selected equipment
     var selectedEquipment = [];
     form.querySelectorAll('#plan-equipment .option-card').forEach(function(card) {
       if (card.classList.contains('selected')) selectedEquipment.push(card.dataset.value);
@@ -7762,10 +7802,58 @@ async function callAIPlanAPI(goal, days, experience, equipment) {
       });
     });
 
-    // Cost display
+    // Questionnaire fields
+    var questionnaire = { sessionLength: 60, injuries: '', weakPoints: [] };
     var submitBtn = form.querySelector('button[type="submit"]');
+    var qSection = document.createElement('div');
+    qSection.innerHTML =
+      '<div class="form-group" style="margin-top:16px;">'
+      + '<label class="form-label">Session length</label>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;" id="plan-session-length">'
+      + ['45','60','75','90'].map(function(m) {
+          return '<button type="button" class="btn btn-secondary btn-sm plan-session-btn' + (m === '60' ? ' active' : '') + '" data-min="' + m + '" style="' + (m === '60' ? 'border-color:var(--accent);color:var(--accent);' : '') + '">' + m + ' min</button>';
+        }).join('')
+      + '</div></div>'
+      + '<div class="form-group" style="margin-top:12px;">'
+      + '<label class="form-label">Injuries or areas to avoid <span style="color:var(--text-tertiary);font-weight:400;">(optional)</span></label>'
+      + '<input type="text" class="form-input" id="plan-injuries" placeholder="e.g. bad lower back, left shoulder pain" style="margin-top:4px;">'
+      + '</div>'
+      + '<div class="form-group" style="margin-top:12px;">'
+      + '<label class="form-label">Weak points to prioritise <span style="color:var(--text-tertiary);font-weight:400;">(optional)</span></label>'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;" id="plan-weak-points">'
+      + ['chest','back','legs','shoulders','arms','core'].map(function(mg) {
+          return '<button type="button" class="btn btn-secondary btn-sm plan-wp-btn" data-mg="' + mg + '" style="text-transform:capitalize;">' + mg + '</button>';
+        }).join('')
+      + '</div></div>';
+    form.insertBefore(qSection, submitBtn);
+
+    // Session length buttons
+    form.querySelectorAll('.plan-session-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        form.querySelectorAll('.plan-session-btn').forEach(function(b) { b.classList.remove('active'); b.style.borderColor = ''; b.style.color = ''; });
+        btn.classList.add('active'); btn.style.borderColor = 'var(--accent)'; btn.style.color = 'var(--accent)';
+        questionnaire.sessionLength = parseInt(btn.dataset.min);
+      });
+    });
+
+    // Weak points buttons
+    form.querySelectorAll('.plan-wp-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var mg = btn.dataset.mg;
+        var idx = questionnaire.weakPoints.indexOf(mg);
+        if (idx >= 0) {
+          questionnaire.weakPoints.splice(idx, 1);
+          btn.classList.remove('active'); btn.style.borderColor = ''; btn.style.color = '';
+        } else {
+          questionnaire.weakPoints.push(mg);
+          btn.classList.add('active'); btn.style.borderColor = 'var(--accent)'; btn.style.color = 'var(--accent)';
+        }
+      });
+    });
+
+    // Cost display
     var costRow = document.createElement('div');
-    costRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg-elevated);border-radius:var(--radius-md);margin-bottom:12px;border:1px solid var(--border-subtle);';
+    costRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg-elevated);border-radius:var(--radius-md);margin-bottom:12px;border:1px solid var(--border-subtle);margin-top:16px;';
     form.insertBefore(costRow, submitBtn);
 
     function updateCostDisplay() {
@@ -7789,22 +7877,23 @@ async function callAIPlanAPI(goal, days, experience, equipment) {
     form.querySelector('#plan-days').addEventListener('change', updateCostDisplay);
     form.querySelector('#plan-exp').addEventListener('change', updateCostDisplay);
 
-    // AI-powered submit handler
+    // AI submit handler
     form.addEventListener('submit', async function(ev) {
       ev.preventDefault();
       var goal = form.querySelector('#plan-goal').value;
       var days = parseInt(form.querySelector('#plan-days').value);
       var experience = form.querySelector('#plan-exp').value;
       var equipment = selectedEquipment.slice();
+      questionnaire.injuries = (form.querySelector('#plan-injuries') || {}).value || '';
       if (!goal) { showToast('Please select a training goal', 'error'); return; }
       var cost = isBeta ? 0 : calcPlanCost(days, experience, equipment.length || 1);
       if (!isBeta && (AppState.tokenBalance || 0) < cost) { showToast('Not enough tokens!', 'error'); return; }
       if (!isBeta && cost > 0) await sbSpendTokens(cost, 'ai_plan');
-      container.innerHTML = '<div class="generating-animation"><div class="generating-spinner"></div><div class="generating-text">Generating your plan...</div><div class="generating-sub">AI is crafting a ' + days + '-day ' + goal + ' program</div></div>';
+      var historyCount = (AppState.workouts || []).length;
+      container.innerHTML = '<div class="generating-animation"><div class="generating-spinner"></div><div class="generating-text">Generating your plan...</div><div class="generating-sub">Analysing' + (historyCount > 0 ? ' your ' + historyCount + ' workouts and ' : ' ') + 'building a personalised ' + days + '-day program</div></div>';
       try {
-        var plan = await callAIPlanAPI(goal, days, experience, equipment);
-        plan.experience = experience;
-        plan.equipment = equipment;
+        var plan = await callAIPlanAPI(goal, days, experience, equipment, questionnaire);
+        plan.experience = experience; plan.equipment = equipment;
         var saved = await sbSavePlan(plan);
         AppState.generatedPlan = saved || plan;
         renderAIPlanGenerator(container);
@@ -7819,5 +7908,102 @@ async function callAIPlanAPI(goal, days, experience, equipment) {
         renderAIPlanGenerator(container);
       }
     });
+
+    // Override swap picker with AI-assisted version
+    window.showSwapPicker = function(dayIdx, exIdx) {
+      var currentPlan = AppState.generatedPlan;
+      if (!currentPlan) return;
+      var exercise = currentPlan.days[dayIdx].exercises[exIdx];
+      var muscleGroup = exercise.muscle_group;
+      var modal = document.createElement('div');
+      modal.className = 'modal-overlay';
+
+      function renderModal(aiSuggestions, loadingAI, selectedReason) {
+        var sameGroup = (AppState.exercises || []).filter(function(e) { return e.muscle_group === muscleGroup && e.name !== exercise.name; });
+        var aiSection = '';
+        if (loadingAI) {
+          aiSection = '<div style="padding:12px 0;text-align:center;color:var(--text-secondary);font-size:13px;">Finding best swaps...</div>';
+        } else if (aiSuggestions && aiSuggestions.length > 0) {
+          aiSection = '<div style="margin-bottom:12px;">'
+            + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);margin-bottom:8px;">AI picks</div>'
+            + aiSuggestions.map(function(s) {
+                return '<div class="modal-exercise-item ai-swap-suggestion" data-name="' + s.name + '" style="border-left:3px solid var(--accent);padding-left:10px;margin-bottom:8px;">'
+                  + '<div style="font-weight:600;font-size:14px;">' + s.name + '</div>'
+                  + '<div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">' + s.reason + '</div>'
+                  + '</div>';
+              }).join('')
+            + '</div><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-tertiary);margin-bottom:8px;">All options</div>';
+        }
+        modal.innerHTML = '<div class="modal-content" style="max-width:420px;">'
+          + '<div class="modal-header"><div class="modal-title">Swap: ' + exercise.name + '</div></div>'
+          + '<div style="padding:0 16px 8px;">'
+          + '<div style="font-size:12px;color:var(--text-secondary);margin-bottom:10px;">Why are you swapping?</div>'
+          + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">'
+          + ['No equipment','Injury / pain','Want variation','Too easy / hard'].map(function(r) {
+              var active = r === selectedReason;
+              return '<button class="btn btn-secondary btn-sm swap-reason-btn" data-reason="' + r + '" style="' + (active ? 'border-color:var(--accent);color:var(--accent);' : '') + '">' + r + '</button>';
+            }).join('')
+          + '</div>'
+          + aiSection
+          + '<input type="text" id="swap-search" class="form-input" placeholder="Search exercises..." style="margin-bottom:10px;" value="">'
+          + '<div style="max-height:260px;overflow-y:auto;">'
+          + sameGroup.map(function(e) {
+              return '<div class="modal-exercise-item" data-name="' + e.name + '">'
+                + '<div style="font-weight:600;font-size:14px;">' + e.name + '</div>'
+                + '<div style="font-size:12px;color:var(--text-secondary);">' + (e.equipment || '') + '</div>'
+                + '</div>';
+            }).join('')
+          + '</div></div></div>';
+
+        // Reason buttons
+        modal.querySelectorAll('.swap-reason-btn').forEach(function(btn) {
+          btn.addEventListener('click', async function() {
+            var reason = btn.dataset.reason;
+            renderModal(null, true, reason);
+            var suggestions = await getAISwapSuggestions(exercise, reason, muscleGroup);
+            renderModal(suggestions, false, reason);
+            attachHandlers(reason);
+          });
+        });
+
+        // Search
+        var searchInput = modal.querySelector('#swap-search');
+        if (searchInput) {
+          searchInput.addEventListener('input', function() {
+            var q = searchInput.value.toLowerCase();
+            modal.querySelectorAll('.modal-exercise-item:not(.ai-swap-suggestion)').forEach(function(item) {
+              item.style.display = item.dataset.name.toLowerCase().includes(q) ? '' : 'none';
+            });
+          });
+        }
+
+        attachHandlers(selectedReason);
+      }
+
+      function attachHandlers(selectedReason) {
+        modal.querySelectorAll('.modal-exercise-item').forEach(function(item) {
+          item.addEventListener('click', function() {
+            var name = item.dataset.name;
+            var match = (AppState.exercises || []).find(function(e) { return e.name === name; });
+            currentPlan.days[dayIdx].exercises[exIdx] = {
+              name: name,
+              exercise_id: match ? match.id : generateId(),
+              muscle_group: muscleGroup,
+              sets: exercise.sets, reps: exercise.reps, rest: exercise.rest
+            };
+            AppState.generatedPlan = currentPlan;
+            modal.remove();
+            renderAIPlanGenerator(container);
+          });
+        });
+
+        modal.addEventListener('click', function(e) {
+          if (e.target === modal) modal.remove();
+        });
+      }
+
+      renderModal(null, false, null);
+      document.body.appendChild(modal);
+    };
   };
 })();
