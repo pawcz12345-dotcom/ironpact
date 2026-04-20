@@ -34,7 +34,8 @@ Deno.serve(async (req) => {
 
   try {
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) return fail('Unauthorized', 401);
+    console.log('[generate-plan] auth header present:', !!authHeader);
+    if (!authHeader) return fail('Unauthorized — no auth header', 401);
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
@@ -43,12 +44,15 @@ Deno.serve(async (req) => {
     );
 
     const { data: { user }, error: authErr } = await supabase.auth.getUser();
-    if (authErr || !user) return fail('Unauthorized', 401);
+    console.log('[generate-plan] user:', user?.id ?? 'null', '| authErr:', authErr?.message ?? 'none');
+    if (authErr || !user) return fail('Unauthorized — ' + (authErr?.message ?? 'no user'), 401);
 
     const body = await req.json();
     const action = body.action || 'generate';
+    console.log('[generate-plan] action:', action, '| goal:', (body as Record<string, unknown>).goal);
 
     const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
+    console.log('[generate-plan] API key present:', !!apiKey);
     if (!apiKey) return fail('ANTHROPIC_API_KEY not configured', 500);
 
     if (action === 'suggest_swap') {
