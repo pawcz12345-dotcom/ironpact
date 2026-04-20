@@ -7803,15 +7803,31 @@ async function getAISwapSuggestions(exercise, reason, muscleGroup) {
     });
 
     // Questionnaire fields
-    var questionnaire = { sessionLength: 60, injuries: '', weakPoints: [] };
+    var questionnaire = { sessionLength: 60, injuries: '', weakPoints: [], splitType: 'ai', customSplit: '' };
     var submitBtn = form.querySelector('button[type="submit"]');
+
+    // Training Split (injected as its own element so it renders independently)
+    var splitSection = document.createElement('div');
+    splitSection.className = 'form-group';
+    splitSection.style.marginTop = '16px';
+    splitSection.innerHTML =
+      '<label class="form-label">Training Split</label>'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;">'
+      + [['ai','AI decides'],['ppl','Push / Pull / Legs'],['upper_lower','Upper / Lower'],['full_body','Full Body'],['bro','Bro Split'],['custom','Custom...']]
+          .map(function(s) {
+            return '<button type="button" class="btn btn-secondary btn-sm plan-split-btn' + (s[0]==='ai'?' active':'') + '" data-split="' + s[0] + '" style="' + (s[0]==='ai'?'border-color:var(--accent);color:var(--accent);':'') + '">' + s[1] + '</button>';
+          }).join('')
+      + '</div>'
+      + '<textarea id="plan-custom-split" class="form-input" placeholder="Describe your split, e.g. Day 1: Chest & Triceps, Day 2: Back & Biceps, Day 3: Legs & Core..." style="display:none;margin-top:8px;height:72px;resize:vertical;"></textarea>';
+    form.insertBefore(splitSection, submitBtn);
+
     var qSection = document.createElement('div');
     qSection.innerHTML =
-      '<div class="form-group" style="margin-top:16px;">'
+      '<div class="form-group" style="margin-top:12px;">'
       + '<label class="form-label">Session length</label>'
-      + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;" id="plan-session-length">'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;">'
       + ['45','60','75','90'].map(function(m) {
-          return '<button type="button" class="btn btn-secondary btn-sm plan-session-btn' + (m === '60' ? ' active' : '') + '" data-min="' + m + '" style="' + (m === '60' ? 'border-color:var(--accent);color:var(--accent);' : '') + '">' + m + ' min</button>';
+          return '<button type="button" class="btn btn-secondary btn-sm plan-session-btn' + (m==='60'?' active':'') + '" data-min="' + m + '" style="' + (m==='60'?'border-color:var(--accent);color:var(--accent);':'') + '">' + m + ' min</button>';
         }).join('')
       + '</div></div>'
       + '<div class="form-group" style="margin-top:12px;">'
@@ -7820,12 +7836,24 @@ async function getAISwapSuggestions(exercise, reason, muscleGroup) {
       + '</div>'
       + '<div class="form-group" style="margin-top:12px;">'
       + '<label class="form-label">Weak points to prioritise <span style="color:var(--text-tertiary);font-weight:400;">(optional)</span></label>'
-      + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;" id="plan-weak-points">'
+      + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;">'
       + ['chest','back','legs','shoulders','arms','core'].map(function(mg) {
           return '<button type="button" class="btn btn-secondary btn-sm plan-wp-btn" data-mg="' + mg + '" style="text-transform:capitalize;">' + mg + '</button>';
         }).join('')
       + '</div></div>';
     form.insertBefore(qSection, submitBtn);
+
+    // Split buttons
+    splitSection.querySelectorAll('.plan-split-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        splitSection.querySelectorAll('.plan-split-btn').forEach(function(b) { b.classList.remove('active'); b.style.borderColor = ''; b.style.color = ''; });
+        btn.classList.add('active'); btn.style.borderColor = 'var(--accent)'; btn.style.color = 'var(--accent)';
+        questionnaire.splitType = btn.dataset.split;
+        var customArea = splitSection.querySelector('#plan-custom-split');
+        if (customArea) customArea.style.display = btn.dataset.split === 'custom' ? '' : 'none';
+      });
+    });
+
 
     // Session length buttons
     form.querySelectorAll('.plan-session-btn').forEach(function(btn) {
@@ -7885,6 +7913,7 @@ async function getAISwapSuggestions(exercise, reason, muscleGroup) {
       var experience = form.querySelector('#plan-exp').value;
       var equipment = selectedEquipment.slice();
       questionnaire.injuries = (form.querySelector('#plan-injuries') || {}).value || '';
+      questionnaire.customSplit = (splitSection.querySelector('#plan-custom-split') || form.querySelector('#plan-custom-split') || {}).value || '';
       if (!goal) { showToast('Please select a training goal', 'error'); return; }
       var cost = isBeta ? 0 : calcPlanCost(days, experience, equipment.length || 1);
       if (!isBeta && (AppState.tokenBalance || 0) < cost) { showToast('Not enough tokens!', 'error'); return; }
@@ -7918,8 +7947,13 @@ async function getAISwapSuggestions(exercise, reason, muscleGroup) {
       var modal = document.createElement('div');
       modal.className = 'modal-overlay';
 
+      var activeFilter = 'all';
+
       function renderModal(aiSuggestions, loadingAI, selectedReason) {
-        var sameGroup = (AppState.exercises || []).filter(function(e) { return e.muscle_group === muscleGroup && e.name !== exercise.name; });
+        var allExercises = (AppState.exercises || []).filter(function(e) { return e.name !== exercise.name; });
+        var filtered = activeFilter === 'all' ? allExercises : allExercises.filter(function(e) { return e.muscle_group === activeFilter; });
+        var muscleGroups = ['all','chest','back','legs','shoulders','arms','core'];
+
         var aiSection = '';
         if (loadingAI) {
           aiSection = '<div style="padding:12px 0;text-align:center;color:var(--text-secondary);font-size:13px;">Finding best swaps...</div>';
@@ -7932,9 +7966,10 @@ async function getAISwapSuggestions(exercise, reason, muscleGroup) {
                   + '<div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">' + s.reason + '</div>'
                   + '</div>';
               }).join('')
-            + '</div><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-tertiary);margin-bottom:8px;">All options</div>';
+            + '</div><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-tertiary);margin-bottom:8px;">All exercises</div>';
         }
-        modal.innerHTML = '<div class="modal-content" style="max-width:420px;">'
+
+        modal.innerHTML = '<div class="modal-content" style="max-width:440px;">'
           + '<div class="modal-header"><div class="modal-title">Swap: ' + exercise.name + '</div></div>'
           + '<div style="padding:0 16px 8px;">'
           + '<div style="font-size:12px;color:var(--text-secondary);margin-bottom:10px;">Why are you swapping?</div>'
@@ -7945,12 +7980,18 @@ async function getAISwapSuggestions(exercise, reason, muscleGroup) {
             }).join('')
           + '</div>'
           + aiSection
-          + '<input type="text" id="swap-search" class="form-input" placeholder="Search exercises..." style="margin-bottom:10px;" value="">'
+          + '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px;">'
+          + muscleGroups.map(function(mg) {
+              var isActive = mg === activeFilter;
+              return '<button class="btn btn-sm swap-mg-filter" data-mg="' + mg + '" style="font-size:11px;padding:3px 8px;text-transform:capitalize;border-radius:99px;border:1px solid ' + (isActive ? 'var(--accent)' : 'var(--border-subtle)') + ';color:' + (isActive ? 'var(--accent)' : 'var(--text-secondary)') + ';background:transparent;">' + mg + '</button>';
+            }).join('')
+          + '</div>'
+          + '<input type="text" id="swap-search" class="form-input" placeholder="Search all exercises..." style="margin-bottom:10px;" value="">'
           + '<div style="max-height:260px;overflow-y:auto;">'
-          + sameGroup.map(function(e) {
-              return '<div class="modal-exercise-item" data-name="' + e.name + '">'
+          + filtered.map(function(e) {
+              return '<div class="modal-exercise-item" data-name="' + e.name + '" data-mg="' + (e.muscle_group||'') + '">'
                 + '<div style="font-weight:600;font-size:14px;">' + e.name + '</div>'
-                + '<div style="font-size:12px;color:var(--text-secondary);">' + (e.equipment || '') + '</div>'
+                + '<div style="font-size:12px;color:var(--text-secondary);text-transform:capitalize;">' + (e.muscle_group||'') + ' · ' + (e.equipment || '') + '</div>'
                 + '</div>';
             }).join('')
           + '</div></div></div>';
@@ -7960,11 +8001,21 @@ async function getAISwapSuggestions(exercise, reason, muscleGroup) {
           btn.addEventListener('click', async function() {
             var reason = btn.dataset.reason;
             renderModal(null, true, reason);
-            var suggestions = await getAISwapSuggestions(exercise, reason, muscleGroup);
+            var suggestions = await getAISwapSuggestions(exercise, reason, activeFilter === 'all' ? muscleGroup : activeFilter);
             renderModal(suggestions, false, reason);
             attachHandlers(reason);
           });
         });
+
+        // Muscle group filter
+        modal.querySelectorAll('.swap-mg-filter').forEach(function(btn) {
+          btn.addEventListener('click', function() {
+            activeFilter = btn.dataset.mg;
+            renderModal(aiSuggestions, false, selectedReason);
+            attachHandlers(selectedReason);
+          });
+        });
+
 
         // Search
         var searchInput = modal.querySelector('#swap-search');
@@ -7972,7 +8023,9 @@ async function getAISwapSuggestions(exercise, reason, muscleGroup) {
           searchInput.addEventListener('input', function() {
             var q = searchInput.value.toLowerCase();
             modal.querySelectorAll('.modal-exercise-item:not(.ai-swap-suggestion)').forEach(function(item) {
-              item.style.display = item.dataset.name.toLowerCase().includes(q) ? '' : 'none';
+              var nameMatch = item.dataset.name.toLowerCase().includes(q);
+              var mgMatch = (item.dataset.mg||'').toLowerCase().includes(q);
+              item.style.display = (nameMatch || mgMatch) ? '' : 'none';
             });
           });
         }
