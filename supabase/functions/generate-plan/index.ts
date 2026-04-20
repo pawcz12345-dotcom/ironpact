@@ -112,7 +112,7 @@ async function handleGenerate(body: Record<string, unknown>, apiKey: string) {
   // Build weak points enforcement instruction
   const weakPoints = q.weakPoints && q.weakPoints.length > 0 ? q.weakPoints : [];
   const weakPointsInstruction = weakPoints.length > 0
-    ? `\nMANDATORY: The athlete has identified these weak points: ${weakPoints.join(', ')}. You MUST include at least one exercise directly targeting each weak point in every day of the plan. This is non-negotiable.`
+    ? `\nWEAK POINTS: The athlete wants to prioritise ${weakPoints.join(', ')}. Add extra weekly volume for these muscles — include more sets and exercises targeting them across the plan where it fits the day's focus. Do NOT force these muscles into every single day; follow smart programming.`
     : '';
 
   // Build split instruction
@@ -139,7 +139,8 @@ async function handleGenerate(body: Record<string, unknown>, apiKey: string) {
     weakPointsInstruction +
     `\n\nReturn ONLY valid JSON (no markdown) in this exact structure:` +
     `\n{"name":"<plan name>","goal":"${goal}","days":[{"name":"Day 1 — <focus>","exercises":[{"name":"<exercise name>","muscle_group":"<chest|back|legs|shoulders|arms|core>","sets":"${sr.sets}","reps":"${sr.reps}","rest":"${sr.rest}"}]}]}` +
-    `\nInclude ${exPerDay} exercises per day. Only use exercises from the provided list. Use the athlete's history and PRs to choose appropriate exercises and progression. Apply sound periodization.`;
+    `\nInclude ${exPerDay} exercises per day. Only use exercises from the provided list. Use the athlete's history and PRs to choose appropriate exercises and progression. Apply sound periodization.` +
+    `\nIMPORTANT: The plan "name" field must accurately reflect the actual split structure you chose (e.g. "4-Day Bro Split Hypertrophy" or "4-Day Upper/Lower Hypertrophy"), NOT a generic or mismatched label.`;
 
   const raw = await callClaude(apiKey, prompt, 2000);
   if (!raw) return fail('Empty AI response', 502);
