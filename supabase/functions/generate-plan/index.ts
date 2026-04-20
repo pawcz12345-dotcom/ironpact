@@ -4,7 +4,6 @@
 //   action: 'suggest_swap'  — suggest 3 exercise swaps with reasoning
 // Requires: ANTHROPIC_API_KEY secret
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -33,19 +32,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get('Authorization');
-    console.log('[generate-plan] auth header present:', !!authHeader);
-    if (!authHeader) return fail('Unauthorized — no auth header', 401);
-
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_ANON_KEY')!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
-
-    const { data: { user }, error: authErr } = await supabase.auth.getUser();
-    console.log('[generate-plan] user:', user?.id ?? 'null', '| authErr:', authErr?.message ?? 'none');
-    if (authErr || !user) return fail('Unauthorized — ' + (authErr?.message ?? 'no user'), 401);
+    console.log('[generate-plan] request received');
 
     const body = await req.json();
     const action = body.action || 'generate';
