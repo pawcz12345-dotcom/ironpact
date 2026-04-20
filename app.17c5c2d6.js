@@ -7484,11 +7484,13 @@ function calcPlanCost(days, experience, equipmentCount) {
 
 async function callAIPlanAPI(goal, days, experience, equipment) {
   if (!supabaseClient) {
+    console.error('[AI Plan] supabaseClient not initialised — falling back to mock');
     return generateMockPlan(goal, days, experience, equipment);
   }
   var sessionData = await supabaseClient.auth.getSession();
   var token = sessionData && sessionData.data && sessionData.data.session && sessionData.data.session.access_token;
-  if (!token) return generateMockPlan(goal, days, experience, equipment);
+  console.log('[AI Plan] token:', token ? 'found' : 'MISSING', '| supabaseClient:', !!supabaseClient);
+  if (!token) throw new Error('No auth token — please log out and back in');
   var resp = await fetch(SUPABASE_URL + '/functions/v1/generate-plan', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
