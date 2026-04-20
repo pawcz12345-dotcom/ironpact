@@ -118,10 +118,17 @@ async function handleGenerate(body: Record<string, unknown>, apiKey: string) {
   if (q.weakPoints && q.weakPoints.length > 0) notes.push(`Weak points to prioritise: ${q.weakPoints.join(', ')}`);
   if (notes.length > 0) notesSection = `\nAthlete notes:\n${notes.map(n => `  • ${n}`).join('\n')}`;
 
+  // Build weak points enforcement instruction
+  const weakPoints = q.weakPoints && q.weakPoints.length > 0 ? q.weakPoints : [];
+  const weakPointsInstruction = weakPoints.length > 0
+    ? `\nMANDATORY: The athlete has identified these weak points: ${weakPoints.join(', ')}. You MUST include at least one exercise directly targeting each weak point in every day of the plan. This is non-negotiable.`
+    : '';
+
   const prompt =
     `Create a ${days}-day training plan for a ${experience} athlete. Goal: ${goalLabel}. Equipment: ${equipmentList.join(', ') || 'bodyweight'}.` +
     historySection + prsSection + notesSection +
     `\n\nAvailable exercises: ${availableExercises.join('; ')}.` +
+    weakPointsInstruction +
     `\n\nReturn ONLY valid JSON (no markdown) in this exact structure:` +
     `\n{"name":"<plan name>","goal":"${goal}","days":[{"name":"Day 1 — <focus>","exercises":[{"name":"<exercise name>","muscle_group":"<chest|back|legs|shoulders|arms|core>","sets":"${sr.sets}","reps":"${sr.reps}","rest":"${sr.rest}"}]}]}` +
     `\nInclude ${exPerDay} exercises per day. Only use exercises from the provided list. Use the athlete's history and PRs to choose appropriate exercises and progression. Apply sound periodization.`;
