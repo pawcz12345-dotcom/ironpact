@@ -20,14 +20,38 @@ alter table profiles
 -- ── 2. Existing users: top up to 1000 ───────────────────────────────────────
 do $$
 declare
-  r record;
-  delta integer;
+  r            record;
+  delta        integer;
+  valid_source text;
+  src_check    text;
 begin
+  -- Discover a valid value for the source column by inspecting the check constraint.
+  -- Falls back to reusing whatever existing rows have, then to 'admin'.
+  select source into valid_source from token_ledger where source is not null limit 1;
+
+  if valid_source is null then
+    select pg_get_constraintdef(oid) into src_check
+    from pg_constraint
+    where conrelid = 'token_ledger'::regclass
+      and conname  = 'token_ledger_source_check';
+
+    raise notice 'token_ledger_source_check: %', src_check;
+
+    -- Extract the first quoted value from e.g. CHECK (source = ANY (ARRAY['purchase'::text, ...]))
+    -- or CHECK (source IN ('purchase', ...))
+    valid_source := (regexp_matches(src_check, '''([^'']+)'''))[1];
+  end if;
+
+  -- Last-resort fallback
+  if valid_source is null then valid_source := 'admin'; end if;
+
+  raise notice 'Using source = ''%'' for alpha_welcome_gift inserts', valid_source;
+
   for r in select id, token_balance from profiles where token_balance < 1000 loop
     delta := 1000 - r.token_balance;
     update profiles set token_balance = 1000 where id = r.id;
-    insert into token_ledger (user_id, amount, reason, transaction_type)
-      values (r.id, delta, 'alpha_welcome_gift', 'earn');
+    insert into token_ledger (user_id, amount, reason, transaction_type, balance_after, source)
+      values (r.id, delta, 'alpha_welcome_gift', 'earn', 1000, valid_source);
   end loop;
 end;
 $$;

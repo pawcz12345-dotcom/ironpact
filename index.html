@@ -182,14 +182,33 @@
   </div>
   <!-- App JS -->
   <script src="./app.17c5c2d6.js?v=20260420-1"></script>
-  <!-- Auth enhancements, AI Plans banner, alpha badge -->
+  <!-- Auth enhancements, AI Plans banner, alpha badge, additional notes -->
   <script>
   (function () {
+    // Intercept generate-plan fetch calls to inject additional_notes from textarea
+    var _origFetch = window.fetch;
+    window.fetch = function (url, opts) {
+      if (typeof url === 'string' && url.includes('generate-plan') && opts && opts.body) {
+        try {
+          var body = JSON.parse(opts.body);
+          var notesEl = document.getElementById('plan-additional-notes');
+          var notesVal = notesEl && notesEl.value ? notesEl.value.trim() : '';
+          if (notesVal) {
+            body.questionnaire = Object.assign({}, body.questionnaire || {}, { additional_notes: notesVal });
+            opts = Object.assign({}, opts, { body: JSON.stringify(body) });
+          }
+        } catch (e) {}
+      }
+      return _origFetch.call(this, url, opts);
+    };
+
+
     var observer = new MutationObserver(function () {
       enhanceSignup();
       enhanceLogin();
       injectWorkoutsAIPlans();
       injectAlphaBadge();
+      injectAIPlanNotes();
     });
     observer.observe(document.body, { childList: true, subtree: true });
 
@@ -233,6 +252,43 @@
       var logoText = header.querySelector('.logo-text');
       if (logoText) logoText.after(badge);
     }
+
+    // ── Additional notes textarea on AI Plans generator ───────────────────────
+    function injectAIPlanNotes() {
+      // Look for any form that contains a generate/submit button on the plans page
+      var form = document.querySelector('.plan-form, #plan-form, form.generate-plan-form');
+      if (!form) {
+        // Fallback: find the form on the generate plan view by its submit button
+        var btns = document.querySelectorAll('button[type="submit"]');
+        for (var i = 0; i < btns.length; i++) {
+          var f = btns[i].closest('form');
+          if (f && !f.id.includes('login') && !f.id.includes('signup')) {
+            var container = f.closest('[class*="plan"], [class*="generate"], [id*="plan"], [id*="generate"]');
+            if (container) { form = f; break; }
+          }
+        }
+      }
+      if (!form || form.dataset.notesInjected) return;
+      form.dataset.notesInjected = '1';
+
+      var wrap = document.createElement('div');
+      wrap.className = 'form-group';
+      wrap.style.cssText = 'margin-top:4px;';
+      wrap.innerHTML =
+        '<label class="form-label" style="font-size:13px;">Additional notes <span style="color:var(--text-tertiary);font-weight:400;">(optional)</span></label>' +
+        '<textarea id="plan-additional-notes" class="form-input" rows="3" ' +
+          'placeholder="e.g. I train at home, prefer compound lifts, avoid barbell squats due to knee pain…" ' +
+          'style="resize:vertical;min-height:72px;font-size:13px;"></textarea>';
+
+      // Insert before the submit button so it appears at the bottom of the form
+      var submitBtn = form.querySelector('button[type="submit"]');
+      if (submitBtn) {
+        submitBtn.parentNode.insertBefore(wrap, submitBtn);
+      } else {
+        form.appendChild(wrap);
+      }
+    }
+
 
     function enhanceSignup() {
       var form = document.getElementById('signup-form');

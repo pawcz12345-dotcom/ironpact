@@ -72,7 +72,7 @@ async function handleGenerate(body: Record<string, unknown>, apiKey: string) {
     experience: string;
     equipment: string[];
     exercises: { name: string; muscle_group?: string; equipment?: string }[];
-    questionnaire?: { sessionLength?: number; injuries?: string; weakPoints?: string[]; splitType?: string; customSplit?: string };
+    questionnaire?: { sessionLength?: number; injuries?: string; weakPoints?: string[]; splitType?: string; customSplit?: string; additional_notes?: string };
     history?: { date: string; name: string; exercises: { name: string; topSet?: { weight_kg?: number; reps?: number } }[] }[];
     prs?: { exercise: string; weight: number; reps: number }[];
   };
@@ -116,6 +116,7 @@ async function handleGenerate(body: Record<string, unknown>, apiKey: string) {
   if (q.sessionLength) notes.push(`Session length: ${q.sessionLength} minutes`);
   if (q.injuries) notes.push(`Injuries/areas to avoid: ${q.injuries}`);
   if (q.weakPoints && q.weakPoints.length > 0) notes.push(`Weak points to prioritise: ${q.weakPoints.join(', ')}`);
+  if (q.additional_notes) notes.push(`Additional instructions: ${q.additional_notes}`);
   if (notes.length > 0) notesSection = `\nAthlete notes:\n${notes.map(n => `  • ${n}`).join('\n')}`;
 
   // Build weak points instruction
