@@ -42,8 +42,8 @@ begin
     valid_source := (regexp_matches(src_check, '''([^'']+)'''))[1];
   end if;
 
-  -- Last-resort fallbacks tried in order
-  if valid_source is null then valid_source := 'admin';    end if;
+  -- Last-resort fallback
+  if valid_source is null then valid_source := 'admin'; end if;
 
   raise notice 'Using source = ''%'' for alpha_welcome_gift inserts', valid_source;
 

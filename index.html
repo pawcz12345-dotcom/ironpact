@@ -182,7 +182,7 @@
   </div>
   <!-- App JS -->
   <script src="./app.17c5c2d6.js?v=20260420-1"></script>
-  <!-- Auth enhancements: confirm password + forgot password -->
+  <!-- Auth enhancements, AI Plans banner, alpha badge, additional notes -->
   <script>
   (function () {
     // Intercept generate-plan fetch calls to inject additional_notes from textarea
@@ -201,6 +201,7 @@
       }
       return _origFetch.call(this, url, opts);
     };
+
 
     var observer = new MutationObserver(function () {
       enhanceSignup();
