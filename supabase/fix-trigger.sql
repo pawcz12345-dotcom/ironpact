@@ -10,7 +10,7 @@
 create or replace function handle_new_user()
 returns trigger as $$
 begin
-  insert into profiles (id, display_name)
+  insert into profiles (id, display_name, token_balance)
   values (
     new.id,
     coalesce(
@@ -18,7 +18,8 @@ begin
       new.raw_user_meta_data->>'name',
       split_part(new.email, '@', 1),
       'Lifter'
-    )
+    ),
+    1000
   )
   on conflict (id) do nothing;
   return new;
