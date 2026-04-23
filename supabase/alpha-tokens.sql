@@ -8,6 +8,11 @@
 -- 3. Logs a token_ledger entry for each existing user who gets topped up
 -- ============================================================
 
+-- ── 0. Ensure token_ledger has all expected columns ─────────────────────────
+alter table token_ledger
+  add column if not exists reason           text,
+  add column if not exists transaction_type text not null default 'earn';
+
 -- ── 1. New users: start with 1000 tokens ────────────────────────────────────
 alter table profiles
   alter column token_balance set default 1000;
