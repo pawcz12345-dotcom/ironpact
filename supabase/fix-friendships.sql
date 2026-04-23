@@ -34,10 +34,20 @@ create policy "friendships_own" on friendships for all using (
 );
 
 -- Step 3: Migrate any existing data from friend_connections -> friendships
-insert into friendships (id, requester_id, addressee_id, status, created_at)
-select id, requester_id, addressee_id, status, created_at
-from friend_connections
-on conflict (requester_id, addressee_id) do nothing;
+-- (skipped automatically if friend_connections does not exist)
+do $$
+begin
+  if exists (
+    select 1 from information_schema.tables
+    where table_schema = 'public' and table_name = 'friend_connections'
+  ) then
+    insert into friendships (id, requester_id, addressee_id, status, created_at)
+    select id, requester_id, addressee_id, status, created_at
+    from friend_connections
+    on conflict (requester_id, addressee_id) do nothing;
+  end if;
+end;
+$$;
 
 -- Step 4: Update the profiles RLS policy that references friend_connections
 drop policy if exists "profiles_read_friends" on profiles;
