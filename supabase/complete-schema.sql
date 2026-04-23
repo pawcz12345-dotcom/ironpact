@@ -536,11 +536,15 @@ create policy "fraud_flags_insert_own" on fraud_flags for insert with check (aut
 create or replace function handle_new_user()
 returns trigger as $$
 begin
-  insert into profiles (id, display_name, email)
+  insert into profiles (id, display_name)
   values (
     new.id,
-    coalesce(new.raw_user_meta_data->>'full_name', 'Lifter'),
-    new.email
+    coalesce(
+      new.raw_user_meta_data->>'full_name',
+      new.raw_user_meta_data->>'name',
+      split_part(new.email, '@', 1),
+      'Lifter'
+    )
   )
   on conflict (id) do nothing;
   return new;
