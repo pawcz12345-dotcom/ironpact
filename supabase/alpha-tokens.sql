@@ -26,8 +26,8 @@ begin
   for r in select id, token_balance from profiles where token_balance < 1000 loop
     delta := 1000 - r.token_balance;
     update profiles set token_balance = 1000 where id = r.id;
-    insert into token_ledger (user_id, amount, reason, transaction_type, balance_after)
-      values (r.id, delta, 'alpha_welcome_gift', 'earn', 1000);
+    insert into token_ledger (user_id, amount, reason, transaction_type, balance_after, source)
+      values (r.id, delta, 'alpha_welcome_gift', 'earn', 1000, 'system');
   end loop;
 end;
 $$;
