@@ -182,5 +182,79 @@
   </div>
   <!-- App JS -->
   <script src="./app.17c5c2d6.js?v=20260420-1"></script>
+  <!-- Auth enhancements: confirm password + forgot password -->
+  <script>
+  (function () {
+    var observer = new MutationObserver(function () {
+      enhanceSignup();
+      enhanceLogin();
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    function enhanceSignup() {
+      var form = document.getElementById('signup-form');
+      if (!form || form.dataset.authEnhanced) return;
+      form.dataset.authEnhanced = '1';
+
+      // Insert confirm-password field after the password field
+      var pwInput = document.getElementById('signup-password');
+      if (!pwInput) return;
+      var pwGroup = pwInput.closest('.form-group');
+      var confirmGroup = document.createElement('div');
+      confirmGroup.className = 'form-group';
+      confirmGroup.innerHTML =
+        '<label class="form-label">Confirm Password</label>' +
+        '<input type="password" class="form-input" placeholder="Re-enter your password" id="signup-confirm-password" required>';
+      pwGroup.after(confirmGroup);
+
+      // Validate match before the app's own submit handler (capture phase)
+      form.addEventListener('submit', function (e) {
+        var pw      = document.getElementById('signup-password').value;
+        var confirm = document.getElementById('signup-confirm-password').value;
+        var errEl   = document.getElementById('signup-error');
+        if (pw !== confirm) {
+          e.stopImmediatePropagation();
+          errEl.textContent    = 'Passwords do not match.';
+          errEl.style.display  = 'block';
+        }
+      }, true);
+    }
+
+    function enhanceLogin() {
+      var form = document.getElementById('login-form');
+      if (!form || form.dataset.authEnhanced) return;
+      form.dataset.authEnhanced = '1';
+
+      // Insert "Forgot password?" link below the password field
+      var pwInput = document.getElementById('login-password');
+      if (!pwInput) return;
+      var pwGroup = pwInput.closest('.form-group');
+      var forgotWrap = document.createElement('div');
+      forgotWrap.style.cssText = 'text-align:right;margin-top:-4px;margin-bottom:12px;font-size:13px;';
+      forgotWrap.innerHTML =
+        '<a href="#" id="forgot-pw-link" style="color:var(--accent);text-decoration:none;">Forgot password?</a>';
+      pwGroup.after(forgotWrap);
+
+      document.getElementById('forgot-pw-link').addEventListener('click', async function (e) {
+        e.preventDefault();
+        var email = (document.getElementById('login-email').value || '').trim();
+        if (!email) { showToast('Enter your email address first', 'error'); return; }
+        this.textContent = 'Sending…';
+        var self = this;
+        try {
+          var result = await supabaseClient.auth.resetPasswordForEmail(email, {
+            redirectTo: window.location.origin + '/#/reset-password'
+          });
+          if (result.error) throw result.error;
+          showToast('Password reset email sent! Check your inbox.', 'success', 5000);
+          self.textContent = 'Email sent ✓';
+        } catch (err) {
+          showToast('Could not send reset email: ' + (err.message || err), 'error');
+          self.textContent = 'Forgot password?';
+        }
+      });
+    }
+  })();
+  </script>
 </body>
 </html>
