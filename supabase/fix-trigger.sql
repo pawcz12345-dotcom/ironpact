@@ -9,22 +9,37 @@
 
 create or replace function handle_new_user()
 returns trigger as $$
+declare
+  uname     text;
+  dname     text;
+  suffix    int := 0;
+  candidate text;
 begin
-  insert into profiles (id, display_name, token_balance)
-  values (
-    new.id,
-    coalesce(
-      new.raw_user_meta_data->>'full_name',
-      new.raw_user_meta_data->>'name',
-      split_part(new.email, '@', 1),
-      'Lifter'
-    ),
-    1000
-  )
+  dname := coalesce(
+    new.raw_user_meta_data->>'full_name',
+    new.raw_user_meta_data->>'name',
+    split_part(new.email, '@', 1),
+    'Lifter'
+  );
+
+  uname := lower(regexp_replace(
+    coalesce(split_part(nullif(new.email, ''), '@', 1), left(new.id::text, 8)),
+    '[^a-z0-9_]', '_', 'g'
+  ));
+  uname     := left(uname, 28);
+  candidate := uname;
+
+  while exists (select 1 from profiles where username = candidate) loop
+    suffix    := suffix + 1;
+    candidate := uname || '_' || suffix::text;
+  end loop;
+
+  insert into profiles (id, username, display_name, token_balance)
+  values (new.id, candidate, dname, 1000)
   on conflict (id) do nothing;
+
   return new;
 exception when others then
-  -- Never block user creation due to profile insert failure
   raise warning 'handle_new_user failed for %: %', new.id, sqlerrm;
   return new;
 end;
