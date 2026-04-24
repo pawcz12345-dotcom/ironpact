@@ -70,6 +70,7 @@
       <div class="sidebar-logo">
         <span class="logo-icon">⬡</span>
         <span class="logo-text">Iron<span class="accent">Pact</span></span>
+        <span style="font-size:9px;font-weight:800;letter-spacing:1px;background:var(--accent);color:#fff;padding:2px 7px;border-radius:20px;margin-left:6px;font-family:var(--font-display,sans-serif);">ALPHA</span>
       </div>
       <div class="sidebar-nav-items">
         <a href="#/dashboard" class="nav-item" data-nav="dashboard">
@@ -184,6 +185,38 @@
   <script src="./app.17c5c2d6.js?v=20260420-1"></script>
   <!-- Auth enhancements, AI Plans banner, alpha badge, additional notes -->
   <script>
+  // ── One-time alpha welcome banner ──────────────────────────────────────────
+  (function () {
+    if (localStorage.getItem('alpha_banner_dismissed')) return;
+    var banner = document.createElement('div');
+    banner.id = 'alpha-banner';
+    banner.style.cssText = [
+      'position:fixed;top:0;left:0;right:0;z-index:9999;',
+      'background:linear-gradient(90deg,#c45200,#ff6b00);',
+      'color:#fff;font-size:13px;font-weight:500;',
+      'display:flex;align-items:center;justify-content:center;gap:10px;',
+      'padding:10px 16px;box-shadow:0 2px 8px rgba(0,0,0,0.25);'
+    ].join('');
+    banner.innerHTML =
+      '<span style="font-size:15px;">🔥</span>' +
+      '<span><strong>IronPact Alpha</strong> — You\'re one of our first testers. ' +
+      'Expect rough edges and share your feedback!</span>' +
+      '<button id="alpha-banner-dismiss" style="' +
+        'background:rgba(255,255,255,0.2);border:none;color:#fff;' +
+        'font-size:13px;font-weight:700;padding:2px 10px;border-radius:20px;' +
+        'cursor:pointer;margin-left:8px;flex-shrink:0;">Got it</button>';
+    document.body.prepend(banner);
+
+    // Push app content down so banner doesn't overlap
+    document.body.style.paddingTop = banner.offsetHeight + 'px';
+
+    document.getElementById('alpha-banner-dismiss').addEventListener('click', function () {
+      banner.remove();
+      document.body.style.paddingTop = '';
+      localStorage.setItem('alpha_banner_dismissed', '1');
+    });
+  })();
+
   (function () {
     // Intercept generate-plan fetch calls to inject additional_notes from textarea
     var _origFetch = window.fetch;
